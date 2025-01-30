@@ -349,11 +349,6 @@
    [] Set up initial tables
    [] Add indexes
    [] Configure constraints
-[] Implement user authentication
-   [] Create users table
-   [] Set up roles
-   [] Add permissions
-   [] Configure OAuth tables
 [] Set up email system tables
    [] Create templates table
    [] Add tracking tables
