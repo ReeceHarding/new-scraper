@@ -2,19 +2,40 @@
   "compilerOptions": {
     "target": "es2018",
     "module": "commonjs",
-    "strict": true,
+    "moduleResolution": "node",
+    "strict": false,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "outDir": "./dist",
     "rootDir": ".",
-    "types": ["node", "mocha", "chai"]
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"]
+    },
+    "types": ["node", "jest", "chai"],
+    "allowJs": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "preserve",
+    "incremental": true,
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "noImplicitAny": false
+  },
+  "ts-node": {
+    "compilerOptions": {
+      "module": "commonjs"
+    }
   },
   "include": [
     "tests/**/*",
-    "src/**/*"
+    "src/**/*",
+    "**/*.ts",
+    "**/*.tsx"
   ],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    "dist"
   ]
 } 

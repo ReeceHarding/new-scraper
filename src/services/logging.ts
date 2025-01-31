@@ -1,40 +1,36 @@
-import pino from 'pino'
-
-// Configure log level based on environment
-const level = process.env.LOG_LEVEL || 'info'
-
-// Create logger instance
-export const logger = pino({
-  level,
-  timestamp: true,
-  formatters: {
-    level: (label) => {
-      return { level: label }
-    }
-  },
-  transport: {
-    target: 'pino-pretty',
-    options: {
-      colorize: true,
-      ignore: 'pid,hostname',
-      translateTime: 'SYS:standard'
-    }
-  }
-})
-
-// Add custom log methods for specific contexts
-export const createContextLogger = (context: string) => {
-  return {
-    info: (msg: string, obj = {}) => logger.info({ context, ...obj }, msg),
-    error: (msg: string, obj = {}) => logger.error({ context, ...obj }, msg),
-    warn: (msg: string, obj = {}) => logger.warn({ context, ...obj }, msg),
-    debug: (msg: string, obj = {}) => logger.debug({ context, ...obj }, msg)
-  }
+interface Logger {
+  info: (message: string, meta?: any) => void;
+  error: (message: string, meta?: any) => void;
+  warn: (message: string, meta?: any) => void;
+  debug: (message: string, meta?: any) => void;
 }
 
-// Create specific loggers for different parts of the application
-export const dbLogger = createContextLogger('database')
-export const migrationLogger = createContextLogger('migrations')
-export const scrapingLogger = createContextLogger('scraping')
-export const emailLogger = createContextLogger('email')
-export const authLogger = createContextLogger('auth') 
+export const logger: Logger = {
+  info: (message: string, meta?: any) => {
+    console.log(JSON.stringify({ level: 'info', message, meta, timestamp: new Date().toISOString() }));
+  },
+  error: (message: string, meta?: any) => {
+    console.error(JSON.stringify({ level: 'error', message, meta, timestamp: new Date().toISOString() }));
+  },
+  warn: (message: string, meta?: any) => {
+    console.warn(JSON.stringify({ level: 'warn', message, meta, timestamp: new Date().toISOString() }));
+  },
+  debug: (message: string, meta?: any) => {
+    console.debug(JSON.stringify({ level: 'debug', message, meta, timestamp: new Date().toISOString() }));
+  },
+};
+
+export const createContextLogger = (context: string): Logger => {
+  return {
+    info: (message: string, meta?: any) => logger.info(message, { ...meta, context }),
+    error: (message: string, meta?: any) => logger.error(message, { ...meta, context }),
+    warn: (message: string, meta?: any) => logger.warn(message, { ...meta, context }),
+    debug: (message: string, meta?: any) => logger.debug(message, { ...meta, context }),
+  };
+};
+
+export const dbLogger = createContextLogger('database');
+export const migrationLogger = createContextLogger('migrations');
+export const scrapingLogger = createContextLogger('scraping');
+export const emailLogger = createContextLogger('email');
+export const authLogger = createContextLogger('auth'); 

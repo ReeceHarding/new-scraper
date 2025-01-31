@@ -1,0 +1,84 @@
+---
+description: every prompt
+globs: 
+---
+Best Claude prompt
+
+# MASTER DEVELOPMENT PROTOCOL
+
+## IMMEDIATE ACTION REQUIRED
+1. Open @Step1-Detailed-Checklist.md
+2. Find first `[]` task
+3. Start implementing NOW - no discussion
+
+## BEFORE YOU START
+MUST have:
+1. Full schema understanding from migrations
+2. Table relationships mapped
+3. Environment variables documented
+4. Existing codebase functionality mapped
+
+## DEVELOPMENT CYCLE
+For each task:
+
+### 1. IMMEDIATE IMPLEMENTATION
+- Write tests FIRST
+- Show test file
+- Show test passing
+- Implement solution
+- Show working code
+
+### 2. VALIDATION REQUIREMENTS
+Must show proof of:
+- Schema alignment
+- Complete call trace
+- Integration tests
+- Passing test suite
+- Logging output
+- Performance metrics
+
+### 3. COMPLETION REQUIREMENTS
+Before marking [x]:
+- Show git commits proving TDD
+- Paste test suite output
+- Show call trace verification
+- Demonstrate schema matching
+- Present logging evidence
+- ALL tests must pass
+
+## DATABASE RULES - NO EXCEPTIONS
+- NO RLS ever
+- NO required columns in existing tables
+- ALL migrations must be safe
+- ALL foreign keys validated
+- Show migration test results
+
+## CODE STANDARDS - MUST FOLLOW
+- SOLID principles
+- Modular components
+- Complete test coverage
+- Clear logging
+- Proper documentation
+
+## CRITICAL RULES
+1. NO marking [x] without ALL proofs
+2. NO skipping validation
+3. NO assumptions
+4. NO incomplete testing
+5. NO shortcuts
+
+## FORBIDDEN ACTIVITIES
+- Writing analysis docs
+- Explaining plans
+- Asking questions
+- Making claims without proof
+- Skipping any tests
+
+## GET TO WORK
+- Code first, talk later
+- Show all proof
+- Keep working until done
+- ALL `[]` must become `[x]`
+- Each [x] requires full evidence
+
+Remember: PROVE EVERYTHING. CODE NOW. NO SHORTCUTS.

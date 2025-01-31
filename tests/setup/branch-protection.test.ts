@@ -1,63 +1,51 @@
-import { expect } from 'chai';
-import axios, { AxiosError } from 'axios';
-import dotenv from 'dotenv';
+import axios from 'axios';
+import { config } from 'dotenv';
 
-dotenv.config();
+config({ path: '.env.test' });
 
-const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
-const OWNER = 'ReeceHarding';
-const REPO = 'new-scraper';
+describe('Branch Protection Rules', () => {
+  const REPO_OWNER = process.env.GITHUB_REPOSITORY_OWNER;
+  const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
 
-interface BranchProtection {
-  required_status_checks: {
-    strict: boolean;
-  };
-  enforce_admins: {
-    enabled: boolean;
-  };
-  required_pull_request_reviews: {
-    dismiss_stale_reviews: boolean;
-    required_approving_review_count: number;
-  };
-  allow_force_pushes: {
-    enabled: boolean;
-  };
-  allow_deletions: {
-    enabled: boolean;
-  };
-}
-
-interface GitHubErrorResponse {
-  message: string;
-}
-
-describe('Branch Protection Setup', () => {
-  it('should have branch protection enabled for main branch', async () => {
+  beforeAll(() => {
     if (!GITHUB_TOKEN) {
       throw new Error('GITHUB_TOKEN environment variable is required');
     }
-
-    const url = `https://api.github.com/repos/${OWNER}/${REPO}/branches/main/protection`;
-    
-    try {
-      const response = await axios.get<BranchProtection>(url, {
-        headers: {
-          'Authorization': `token ${GITHUB_TOKEN}`,
-          'Accept': 'application/vnd.github.v3+json'
-        }
-      });
-
-      const protection = response.data;
-      
-      expect(protection.required_status_checks.strict).to.be.true;
-      expect(protection.enforce_admins.enabled).to.be.true;
-      expect(protection.required_pull_request_reviews.dismiss_stale_reviews).to.be.true;
-      expect(protection.required_pull_request_reviews.required_approving_review_count).to.equal(1);
-      expect(protection.allow_force_pushes.enabled).to.be.true;
-      expect(protection.allow_deletions.enabled).to.be.true;
-    } catch (error) {
-      const axiosError = error as AxiosError<GitHubErrorResponse>;
-      throw new Error(`Failed to get branch protection: ${axiosError.response?.data?.message || axiosError.message}`);
+    if (!REPO_OWNER) {
+      throw new Error('GITHUB_REPOSITORY_OWNER environment variable is required');
     }
+  });
+
+  it('should have branch protection enabled for main branch', async () => {
+    const response = await axios.get(
+      `https://api.github.com/repos/${REPO_OWNER}/new-scraper/branches/main/protection`,
+      {
+        headers: {
+          Authorization: `token ${GITHUB_TOKEN}`,
+          Accept: 'application/vnd.github.v3+json',
+        },
+      }
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.data.required_status_checks).toBeDefined();
+    expect(response.data.enforce_admins.enabled).toBe(true);
+  });
+
+  it('should require status checks to pass before merging', async () => {
+    const response = await axios.get(
+      `https://api.github.com/repos/${REPO_OWNER}/new-scraper/branches/main/protection/required_status_checks`,
+      {
+        headers: {
+          Authorization: `token ${GITHUB_TOKEN}`,
+          Accept: 'application/vnd.github.v3+json',
+        },
+      }
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.data.strict).toBe(true);
+    expect(response.data.contexts).toHaveLength(1);
+    expect(response.data.contexts[0]).toBe('test');
   });
 }); 

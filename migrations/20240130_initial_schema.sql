@@ -1,6 +1,16 @@
 -- Migration: Initial Schema
 -- Description: Core database schema for the web scraping and outreach platform
--- Created at: 2024-01-30
+-- Created at: 2024-01-30T00:00:00Z
+
+-- Create schema_versions table
+CREATE TABLE IF NOT EXISTS schema_versions (
+  version VARCHAR(255) PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  applied_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Insert initial version
+INSERT INTO schema_versions (version, name) VALUES ('0', 'initial_schema');
 
 --------------------------------------------------------------------------------
 -- 0) CREATE STORAGE BUCKETS
