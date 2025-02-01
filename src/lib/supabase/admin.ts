@@ -1,70 +1,75 @@
 import { createClient } from '@supabase/supabase-js'
-import type { Database } from '../../types/supabase'
-import { SupabaseError, handleSupabaseError } from './client'
+import { logError } from '../logging'
+import type { Database } from './client'
 
-if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
-  throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL')
+// Validate required environment variables
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+if (!supabaseUrl || !supabaseServiceRoleKey) {
+  const error = new Error('Missing Supabase admin environment variables')
+  logError(error, 'Supabase Admin Client Initialization')
+  throw error
 }
 
-if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
-  throw new Error('Missing SUPABASE_SERVICE_ROLE_KEY')
-}
-
+// Create Supabase admin client with service role key
 export const supabaseAdmin = createClient<Database>(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY,
+  supabaseUrl,
+  supabaseServiceRoleKey,
   {
     auth: {
-      autoRefreshToken: false,
-      persistSession: false
+      persistSession: false,
+      autoRefreshToken: false
     },
-    db: {
-      schema: 'public'
+    global: {
+      headers: {
+        'x-application-name': 'lead-generation-platform-admin'
+      }
     }
   }
 )
 
-// Type-safe wrapper for admin operations
-export const adminDb = {
-  from: <T extends keyof Database['public']['Tables']>(table: T) => {
-    return supabaseAdmin.from(table)
+// Helper function to handle database operations with admin privileges
+export async function withAdmin<T>(
+  operation: (client: typeof supabaseAdmin) => Promise<T>
+): Promise<T> {
+  try {
+    return await operation(supabaseAdmin)
+  } catch (error) {
+    logError(error instanceof Error ? error : new Error(String(error)), 'Supabase Admin Operation')
+    throw error
   }
 }
 
-// Admin-specific utilities
-export const adminUtils = {
-  async createUser(email: string, password: string) {
-    try {
-      const { data, error } = await supabaseAdmin.auth.admin.createUser({
-        email,
-        password,
-        email_confirm: true
-      })
-      
+// Export admin-specific operations
+export const adminOperations = {
+  // Organization operations
+  createOrganization: async (name: string, ownerId: string) => {
+    return withAdmin(async (client) => {
+      const { data, error } = await client
+        .from('organizations')
+        .insert([{ name, owner_id: ownerId }])
+        .select()
+        .single()
+
       if (error) throw error
       return data
-    } catch (error) {
-      return handleSupabaseError(error)
-    }
+    })
   },
-  
-  async deleteUser(userId: string) {
-    try {
-      const { data, error } = await supabaseAdmin.auth.admin.deleteUser(userId)
+
+  // User operations
+  deleteUser: async (userId: string) => {
+    return withAdmin(async (client) => {
+      const { error } = await client.auth.admin.deleteUser(userId)
       if (error) throw error
-      return data
-    } catch (error) {
-      return handleSupabaseError(error)
-    }
+    })
   },
-  
-  async listUsers() {
-    try {
-      const { data: { users }, error } = await supabaseAdmin.auth.admin.listUsers()
+
+  // Database operations
+  resetUserPassword: async (userId: string, password: string) => {
+    return withAdmin(async (client) => {
+      const { error } = await client.auth.admin.updateUserById(userId, { password })
       if (error) throw error
-      return users
-    } catch (error) {
-      return handleSupabaseError(error)
-    }
+    })
   }
 } 

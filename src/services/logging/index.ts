@@ -42,6 +42,22 @@ export const logger = winston.createLogger({
   transports,
 })
 
+export interface Logger {
+  info: (message: string, meta?: any) => void;
+  error: (message: string, meta?: any) => void;
+  warn: (message: string, meta?: any) => void;
+  debug: (message: string, meta?: any) => void;
+}
+
+export const createContextLogger = (context: string): Logger => {
+  return {
+    info: (message: string, meta?: any) => logger.info(message, { ...meta, context }),
+    error: (message: string, meta?: any) => logger.error(message, { ...meta, context }),
+    warn: (message: string, meta?: any) => logger.warn(message, { ...meta, context }),
+    debug: (message: string, meta?: any) => logger.debug(message, { ...meta, context }),
+  };
+};
+
 // Create a stream object for Morgan HTTP request logging
 export const stream = {
   write: (message: string) => {

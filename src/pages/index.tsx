@@ -1,28 +1,54 @@
-import { useEffect, useState } from 'react'
-import { useSupabaseClient, useUser } from '@supabase/auth-helpers-react'
-import { useRouter } from 'next/router'
+import { Box, Container, Heading, Text, VStack } from '@chakra-ui/react'
+import Head from 'next/head'
+import { useState } from 'react'
+import { GoalInput } from '@/components/GoalInput'
+import { ResultsDisplay } from '@/components/ResultsDisplay'
+import type { NextPage } from 'next'
 
-export default function Home() {
-  const supabase = useSupabaseClient()
-  const user = useUser()
-  const router = useRouter()
+const Home: NextPage = () => {
+  const [results, setResults] = useState<any[]>([])
+  const [isLoading, setIsLoading] = useState(false)
 
-  useEffect(() => {
-    if (!user) {
-      router.push('/auth/signin')
+  const handleGoalSubmit = async (goal: string) => {
+    setIsLoading(true)
+    try {
+      // TODO: Implement goal processing
+      setResults([])
+    } catch (error) {
+      console.error('Error processing goal:', error)
+    } finally {
+      setIsLoading(false)
     }
-  }, [user, router])
-
-  if (!user) {
-    return null
   }
 
   return (
-    <main className="min-h-screen p-8">
-      <h1 className="text-4xl font-bold mb-8">Dashboard</h1>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {/* Dashboard cards will go here */}
-      </div>
-    </main>
+    <>
+      <Head>
+        <title>Lead Generation Platform</title>
+        <meta name="description" content="AI-powered lead generation and outreach platform" />
+        <link rel="icon" href="/favicon.ico" />
+      </Head>
+
+      <Box as="main" py={10}>
+        <Container maxW="container.xl">
+          <VStack spacing={8} align="stretch">
+            <Box textAlign="center">
+              <Heading as="h1" size="2xl" mb={4}>
+                Lead Generation Platform
+              </Heading>
+              <Text fontSize="xl" color="gray.600">
+                Discover and connect with potential clients using AI
+              </Text>
+            </Box>
+
+            <GoalInput onSubmit={handleGoalSubmit} isLoading={isLoading} />
+
+            <ResultsDisplay results={results} isLoading={isLoading} />
+          </VStack>
+        </Container>
+      </Box>
+    </>
   )
-} 
+}
+
+export default Home 

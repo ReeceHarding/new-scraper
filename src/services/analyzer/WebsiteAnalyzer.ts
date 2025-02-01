@@ -1,7 +1,7 @@
-import { WebDriver, By } from 'selenium-webdriver'
-import { BrowserService } from '@/services/browser/BrowserService'
-import { logger } from '@/services/logging'
-import { OpenAI } from 'openai'
+import { WebDriver, By } from 'selenium-webdriver';
+import { BrowserService } from '@/services/browser/BrowserService';
+import { OpenAIService, ChatMessage } from '@/services/openai/OpenAIService';
+import { logger } from '@/services/logging';
 
 interface AnalysisResult {
   url: string
@@ -9,8 +9,6 @@ interface AnalysisResult {
   emails: string[]
   suggestedEmail: string
   metadata: {
-    title: string
-    description: string
     industry: string
     services: string[]
     contactInfo: {
@@ -23,11 +21,11 @@ interface AnalysisResult {
 
 export class WebsiteAnalyzer {
   private readonly browserService: BrowserService
-  private readonly openai: OpenAI
+  private readonly openai: OpenAIService
 
   constructor() {
     this.browserService = BrowserService.getInstance()
-    this.openai = new OpenAI()
+    this.openai = OpenAIService.getInstance()
   }
 
   async analyzeWebsite(url: string, context: { 
@@ -89,72 +87,68 @@ export class WebsiteAnalyzer {
     return [...new Set(matches)]
   }
 
-  private async generateAnalysis(content: string, context: {
-    targetIndustry: string,
-    serviceOffering: string
-  }): Promise<{
-    summary: string,
-    metadata: AnalysisResult['metadata']
-  }> {
-    const response = await this.openai.chat.completions.create({
-      model: process.env.OPENAI_MODEL_VERSION,
-      messages: [
+  private async generateAnalysis(content: string, context: { 
+    targetIndustry: string, 
+    serviceOffering: string 
+  }): Promise<{ summary: string, metadata: AnalysisResult['metadata'] }> {
+    const messages: ChatMessage[] = [
+      {
+        role: 'system',
+        content: `You are an expert at analyzing business websites.
+        Given the content of a website and the target industry/service context,
+        analyze the content and return a JSON object with the following structure:
         {
-          role: 'system',
-          content: `Analyze the following website content. Extract key business information and create a summary.
-          Focus on details relevant to ${context.serviceOffering} services for the ${context.targetIndustry} industry.
-          Return a JSON object with the following structure:
-          {
-            "summary": "brief summary of the business",
-            "metadata": {
-              "title": "business name/title",
-              "description": "business description",
-              "industry": "specific industry",
-              "services": ["service1", "service2"],
-              "contactInfo": {
-                "phone": "phone number if found",
-                "address": "address if found",
-                "socialMedia": ["social media links"]
-              }
+          "summary": "Brief summary of the business",
+          "metadata": {
+            "industry": "Detected industry",
+            "services": ["service1", "service2"],
+            "contactInfo": {
+              "phone": "phone number if found",
+              "address": "address if found",
+              "socialMedia": ["social media links"]
             }
-          }`
-        },
-        {
-          role: 'user',
-          content: content
-        }
-      ],
+          }
+        }`
+      },
+      {
+        role: 'user',
+        content: JSON.stringify({
+          content,
+          context
+        })
+      }
+    ]
+
+    const response = await this.openai.createChatCompletion(messages, {
       temperature: 0.3,
-      max_tokens: 1000
+      maxTokens: 1000
     })
 
-    return JSON.parse(response.choices[0].message.content)
+    return JSON.parse(response)
   }
 
   private async generateEmailTemplate(
     analysis: { summary: string, metadata: AnalysisResult['metadata'] },
     context: { targetIndustry: string, serviceOffering: string }
   ): Promise<string> {
-    const response = await this.openai.chat.completions.create({
-      model: process.env.OPENAI_MODEL_VERSION,
-      messages: [
-        {
-          role: 'system',
-          content: `Generate a personalized cold email template for a business offering ${context.serviceOffering} 
-          to a potential client in the ${context.targetIndustry} industry. Use the provided business analysis 
-          to make the email specific and relevant. The email should be professional, concise, and highlight 
-          the value proposition. Focus on how your services can help solve their specific problems or improve 
-          their business.`
-        },
-        {
-          role: 'user',
-          content: JSON.stringify(analysis)
-        }
-      ],
-      temperature: 0.7,
-      max_tokens: 500
-    })
+    const messages: ChatMessage[] = [
+      {
+        role: 'system',
+        content: `Generate a personalized cold email template for a business offering ${context.serviceOffering} 
+        to a potential client in the ${context.targetIndustry} industry. Use the provided business analysis 
+        to make the email specific and relevant. The email should be professional, concise, and highlight 
+        the value proposition. Focus on how your services can help solve their specific problems or improve 
+        their business.`
+      },
+      {
+        role: 'user',
+        content: JSON.stringify(analysis)
+      }
+    ]
 
-    return response.choices[0].message.content
+    return await this.openai.createChatCompletion(messages, {
+      temperature: 0.7,
+      maxTokens: 500
+    })
   }
 } 

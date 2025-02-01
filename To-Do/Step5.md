@@ -6,9 +6,9 @@ Implement a robust website crawling system that can traverse websites to a depth
 ## 1. Crawler Core
 
 ### 1.1 URL Management
-- [ ] Implement URL handling
-  - [ ] Create URL normalization
-  - [ ] Add URL validation
+- [x] Implement URL handling
+  - [x] Create URL normalization
+  - [x] Add URL validation
   - [ ] Implement URL queuing
   - [ ] Add URL deduplication
   - [ ] Implement URL prioritization

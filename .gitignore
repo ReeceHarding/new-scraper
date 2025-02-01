@@ -75,4 +75,49 @@ yarn-error.log*
 # Certificates and Keys
 *.pem
 *.key
-*.crt 
+*.crt
+
+# Environment variables
+.env*
+!.env.example
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Logs
+logs/
+*.log
+
+# Cache
+.cache/
+.eslintcache
+.stylelintcache
+*.tsbuildinfo
+
+# Misc
+.DS_Store
+*.pem
+.vercel
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Supabase
+.supabase/
+supabase/.temp/
+supabase/.branches/
+
+# Browser automation
+.selenium/
+chromedriver/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.temp 

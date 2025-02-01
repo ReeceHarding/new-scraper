@@ -103,8 +103,7 @@ describe('BackupService', () => {
       const result = await backupService.createBackup()
       expect(result).toMatch(/backup-.*\.sql/)
       expect(childProcess.exec).toHaveBeenCalledWith(
-        expect.stringContaining('pg_dump'),
-        expect.any(Object),
+        expect.stringMatching(/^PGPASSWORD="test-password" pg_dump -h "test.supabase.co" -p 5432 -U "postgres" -d "postgres" -F p -f ".*backup-.*\.sql"$/),
         expect.any(Function)
       )
     })
@@ -134,8 +133,11 @@ describe('BackupService', () => {
     it('should restore a backup successfully', async () => {
       await backupService.restoreBackup(testBackupFile)
       expect(childProcess.exec).toHaveBeenCalledWith(
-        expect.stringContaining('psql'),
-        expect.any(Object),
+        expect.stringMatching(/^PGPASSWORD="test-password" psql -h "test.supabase.co" -p 5432 -U "postgres" -d "postgres" -c "SELECT pg_terminate_backend\(pg_stat_activity.pid\) FROM pg_stat_activity WHERE pg_stat_activity.datname = 'postgres' AND pid <> pg_backend_pid\(\);"$/),
+        expect.any(Function)
+      )
+      expect(childProcess.exec).toHaveBeenCalledWith(
+        expect.stringMatching(/^PGPASSWORD="test-password" psql -h "test.supabase.co" -p 5432 -U "postgres" -d "postgres" -f ".*test-backup.sql"$/),
         expect.any(Function)
       )
     })
@@ -166,8 +168,7 @@ describe('BackupService', () => {
       const result = await backupService.listBackups()
       expect(result).toEqual(['backup1.sql', 'backup2.sql'])
       expect(childProcess.exec).toHaveBeenCalledWith(
-        expect.stringContaining('ls -1'),
-        expect.any(Object),
+        expect.stringMatching(/^ls -1 ".*backups"$/),
         expect.any(Function)
       )
     })
@@ -211,8 +212,7 @@ describe('BackupService', () => {
     it('should delete a backup successfully', async () => {
       await backupService.deleteBackup(testBackupFile)
       expect(childProcess.exec).toHaveBeenCalledWith(
-        expect.stringContaining('rm'),
-        expect.any(Object),
+        expect.stringMatching(/^rm ".*test-backup.sql"$/),
         expect.any(Function)
       )
     })
@@ -242,8 +242,7 @@ describe('BackupService', () => {
     it('should clean up old backups successfully', async () => {
       await backupService.cleanupOldBackups()
       expect(childProcess.exec).toHaveBeenCalledWith(
-        expect.stringContaining('find'),
-        expect.any(Object),
+        expect.stringMatching(/^find ".*backups" -name "backup-\*\.sql" -type f -mtime \+30 -delete$/),
         expect.any(Function)
       )
     })
