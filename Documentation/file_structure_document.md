@@ -1,23 +1,290 @@
-# Introduction
+# File Structure Documentation
 
-A well-organized file structure is the backbone of our AI-powered Lead Generation and Outreach Platform. It not only simplifies the day-to-day tasks of developers but also lays a solid foundation for collaboration among engineers, designers, and product experts. This project, designed to convert natural language business goals into actionable, automated lead generation and outreach strategies, involves multiple services and integrations such as Brave Search, OpenAI, and Supabase. With clear file organization, the project becomes more accessible and easier to maintain as new features get added over time.
+This document outlines the organization and structure of our AI-powered lead generation platform's codebase.
 
-# Overview of the Tech Stack
+# Frontend Structure
 
-The platform harnesses modern web technologies, integrating a powerful combination of frontend and backend tools. The front end is built with React, allowing us to create a modern, component-based user interface that is both clean and effective. On the backend, Node.js with Express handles our API requests and business logic, while Supabase manages our structured data storage and token-based authentication. Additionally, the project leverages third-party APIs like Brave Search for data sourcing, OpenAI for smart query generation and content creation, and SendGrid or Mailgun for email delivery. Each part of the tech stack plays a role in influencing our file structure by dictating how we organize our components, server logic, configurations, and integrations to ensure everything works in harmony.
+## Component Organization
+```text
+src/
+├── components/
+│   ├── auth/
+│   │   ├── LoginForm.tsx
+│   │   ├── RegisterForm.tsx
+│   │   ├── ResetPassword.tsx
+│   │   └── SocialAuth.tsx
+│   ├── common/
+│   │   ├── Button.tsx
+│   │   ├── Input.tsx
+│   │   ├── Modal.tsx
+│   │   └── Loading.tsx
+│   ├── dashboard/
+│   │   ├── Overview.tsx
+│   │   ├── Analytics.tsx
+│   │   ├── Charts.tsx
+│   │   └── Metrics.tsx
+│   ├── leads/
+│   │   ├── LeadList.tsx
+│   │   ├── LeadCard.tsx
+│   │   ├── LeadForm.tsx
+│   │   └── LeadFilters.tsx
+│   ├── search/
+│   │   ├── GoalInput.tsx
+│   │   ├── SearchResults.tsx
+│   │   ├── ResultCard.tsx
+│   │   └── Filters.tsx
+│   └── campaigns/
+│       ├── CampaignList.tsx
+│       ├── CampaignForm.tsx
+│       ├── TemplateEditor.tsx
+│       └── Scheduler.tsx
+```
 
-# Root Directory Structure
+## Component Guidelines
+- One component per file
+- PascalCase for component names
+- Colocate related components
+- Shared components in common/
+- Feature-based organization
 
-At the highest level, the root directory holds a well-defined structure that separates concerns clearly. The main directories include a 'frontend' folder for all React components, styles, and assets, and a 'backend' folder that contains the Express API, business logic, and integration code. There is also a 'database' directory dedicated to Supabase scripts and database migration files. In addition to these, a 'docs' folder holds project documentation, ensuring that every team member has access to all the necessary reference material. Essential configuration files and project-level documentation are also present directly in the root directory, such as a README file, package configuration files, and build scripts which allow both developers and non-technical stakeholders to understand and manage the project setup easily.
+# API Integration
 
-# Configuration and Environment Files
+## API Client Structure
+```text
+src/
+├── api/
+│   ├── client.ts
+│   ├── config.ts
+│   ├── types.ts
+│   ├── auth/
+│   │   ├── index.ts
+│   │   ├── types.ts
+│   │   └── endpoints.ts
+│   ├── search/
+│   │   ├── index.ts
+│   │   ├── types.ts
+│   │   └── endpoints.ts
+│   ├── leads/
+│   │   ├── index.ts
+│   │   ├── types.ts
+│   │   └── endpoints.ts
+│   └── campaigns/
+│       ├── index.ts
+│       ├── types.ts
+│       └── endpoints.ts
+```
 
-Proper setup of configuration and environment files is key to ensuring that the project runs smoothly across different environments. In the project, individual configuration files reside at the root level or in dedicated folders, each serving a specific function. Files like the environment file (.env) store critical variables such as API keys, database URLs, and authentication tokens. Build configurations for tools like Webpack or any custom scripts are clearly separated, making it easy to switch between development, staging, and production environments. These files collectively help maintain consistency in dependency management and ensure that each environment is set up correctly every time, ultimately supporting seamless integration with external APIs and services.
+## API Guidelines
+- Axios for HTTP requests
+- TypeScript interfaces
+- Error handling middleware
+- Request/response interceptors
+- Rate limiting handling
+
+# State Management
+
+## State Architecture
+```text
+src/
+├── store/
+│   ├── index.ts
+│   ├── types.ts
+│   ├── auth/
+│   │   ├── slice.ts
+│   │   ├── selectors.ts
+│   │   └── thunks.ts
+│   ├── search/
+│   │   ├── slice.ts
+│   │   ├── selectors.ts
+│   │   └── thunks.ts
+│   ├── leads/
+│   │   ├── slice.ts
+│   │   ├── selectors.ts
+│   │   └── thunks.ts
+│   └── campaigns/
+│       ├── slice.ts
+│       ├── selectors.ts
+│       └── thunks.ts
+```
+
+## State Guidelines
+- Redux Toolkit
+- Feature-based slices
+- Normalized state shape
+- Memoized selectors
+- Async thunks
+
+# Testing Organization
+
+## Test File Layout
+```text
+src/
+├── __tests__/
+│   ├── components/
+│   │   ├── auth/
+│   │   ├── common/
+│   │   ├── dashboard/
+│   │   ├── leads/
+│   │   └── search/
+│   ├── api/
+│   │   ├── auth/
+│   │   ├── search/
+│   │   └── leads/
+│   ├── store/
+│   │   ├── auth/
+│   │   ├── search/
+│   │   └── leads/
+│   └── utils/
+│       ├── validation/
+│       ├── formatting/
+│       └── helpers/
+```
+
+## Testing Guidelines
+- Jest for unit tests
+- React Testing Library
+- Cypress for E2E
+- Test file naming: *.test.ts
+- Coverage thresholds
 
 # Documentation Structure
 
-The project’s documentation is organized in a dedicated folder called 'docs', where all critical documents are stored. Here you will find descriptive files including the project requirements document, app flow diagram, tech stack details, and additional guidelines such as frontend and backend structure documents. This structured approach to documentation ensures that everyone, regardless of technical expertise, is kept in the loop regarding best practices, coding standards, and project expectations. With this clear separation and organized information, team members can refer back to key documents to understand how the different components of the project interlock and operate together.
+## Documentation Layout
+```text
+docs/
+├── getting-started/
+│   ├── installation.md
+│   ├── configuration.md
+│   └── development.md
+├── architecture/
+│   ├── overview.md
+│   ├── frontend.md
+│   └── backend.md
+├── features/
+│   ├── auth.md
+│   ├── search.md
+│   └── leads.md
+├── api/
+│   ├── auth.md
+│   ├── search.md
+│   └── leads.md
+└── deployment/
+    ├── staging.md
+    ├── production.md
+    └── monitoring.md
+```
 
-# Conclusion and Overall Summary
+## Documentation Guidelines
+- Markdown format
+- Clear hierarchy
+- Code examples
+- API documentation
+- Diagrams with Mermaid
 
-In summary, the carefully arranged file structure not only supports the daily development processes but also forms a crucial aspect of the project’s long-term maintainability. The division of frontend, backend, database, configuration, and documentation into their respective directories ensures that the components remain modular, accessible, and manageable as the project evolves. This unique organization is particularly valuable for a complex, multi-integrated platform like our AI-powered lead generation and outreach system. By following this structured layout, we pave the way for smooth collaboration, robust system architecture, and efficient scaling, meeting the demands of both business users and technical teams alike.
+# Project Root Structure
+
+```text
+/
+├── src/
+│   ├── components/
+│   ├── api/
+│   ├── store/
+│   ├── utils/
+│   └── __tests__/
+├── public/
+│   ├── assets/
+│   └── static/
+├── docs/
+│   ├── getting-started/
+│   └── api/
+├── scripts/
+│   ├── build.js
+│   └── deploy.js
+├── config/
+│   ├── webpack.config.js
+│   └── jest.config.js
+├── package.json
+├── tsconfig.json
+├── .env.example
+├── .gitignore
+└── README.md
+```
+
+# Development Guidelines
+
+## File Naming
+- Components: PascalCase.tsx
+- Utilities: camelCase.ts
+- Tests: *.test.ts
+- Types: *.types.ts
+- Constants: UPPERCASE.ts
+
+## Import Organization
+1. External libraries
+2. Internal modules
+3. Components
+4. Styles
+5. Types
+6. Constants
+
+## Code Organization
+- Feature-first structure
+- Colocated tests
+- Shared utilities
+- Clear separation of concerns
+- Consistent naming conventions
+
+## Version Control
+- Feature branches
+- Semantic commits
+- Pull request templates
+- Code review guidelines
+- Branch protection rules
+
+# Build and Deploy Structure
+
+## Build Output
+```text
+dist/
+├── static/
+│   ├── js/
+│   ├── css/
+│   └── media/
+├── assets/
+│   ├── images/
+│   └── fonts/
+└── index.html
+```
+
+## Deployment Configuration
+```text
+deploy/
+├── staging/
+│   ├── docker-compose.yml
+│   └── nginx.conf
+├── production/
+│   ├── docker-compose.yml
+│   └── nginx.conf
+└── scripts/
+    ├── deploy-staging.sh
+    └── deploy-prod.sh
+```
+
+# Environment Configuration
+
+## Environment Files
+```text
+/
+├── .env.example
+├── .env.local
+├── .env.development
+├── .env.test
+└── .env.production
+```
+
+## Configuration Guidelines
+- Use environment variables
+- Secure sensitive data
+- Environment-specific configs
+- Documentation of variables
+- Validation on startup
