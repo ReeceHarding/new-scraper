@@ -1,37 +1,61 @@
 import fs from 'fs';
 import path from 'path';
 
-describe('File Structure Documentation', () => {
-  const docPath = path.join(process.cwd(), 'Documentation');
-  
-  test('file structure documentation exists and contains required sections', () => {
-    // Check if file_structure_document.md exists
-    const structurePath = path.join(docPath, 'file_structure_document.md');
-    expect(fs.existsSync(structurePath)).toBe(true);
-    
-    const content = fs.readFileSync(structurePath, 'utf8');
-    
-    // Check for required sections
-    expect(content).toContain('# Frontend Structure');
-    expect(content).toContain('# API Integration');
-    expect(content).toContain('# State Management');
-    expect(content).toContain('# Testing Organization');
-    expect(content).toContain('# Documentation Structure');
-    
-    // Check for specific details
-    expect(content).toMatch(/## Component Organization/);
-    expect(content).toMatch(/## API Client Structure/);
-    expect(content).toMatch(/## State Architecture/);
-    expect(content).toMatch(/## Test File Layout/);
-    expect(content).toMatch(/## Documentation Layout/);
-    
-    // Check for directory trees
-    expect(content).toMatch(/```text/);
-    expect(content).toMatch(/src\//);
-    expect(content).toMatch(/components\//);
-    expect(content).toMatch(/api\//);
-    expect(content).toMatch(/store\//);
-    expect(content).toMatch(/__tests__\//);
-    expect(content).toMatch(/docs\//);
+describe('File Structure', () => {
+  const rootDir = process.cwd();
+
+  test('required directories exist', () => {
+    const requiredDirs = [
+      'src/components',
+      'src/components/auth',
+      'src/components/common',
+      'src/components/dashboard',
+      'src/components/leads',
+      'src/components/search',
+      'src/components/campaigns',
+      'src/api',
+      'src/api/auth',
+      'src/api/search',
+      'src/api/leads',
+      'src/api/campaigns',
+      'src/store',
+      'src/store/auth',
+      'src/store/search',
+      'src/store/leads',
+      'src/store/campaigns',
+      'src/__tests__',
+      'src/__tests__/components',
+      'src/__tests__/api',
+      'src/__tests__/store',
+      'src/__tests__/utils',
+      'public/assets',
+      'public/static',
+      'config',
+    ];
+
+    requiredDirs.forEach(dir => {
+      const fullPath = path.join(rootDir, dir);
+      expect(fs.existsSync(fullPath)).toBe(true);
+    });
+  });
+
+  test('required files exist', () => {
+    const requiredFiles = [
+      'package.json',
+      'tsconfig.json',
+      '.env.example',
+      '.gitignore',
+      'README.md',
+      'src/api/client.ts',
+      'src/api/config.ts',
+      'src/api/types.ts',
+      'src/store/index.ts',
+      'src/store/types.ts',
+    ];
+
+    requiredFiles.forEach(file => {
+      const fullPath = path.join(rootDir, file);
+      expect(fs.existsSync(fullPath)).toBe(true);
+    });
   });
 }); 
