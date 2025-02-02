@@ -1,35 +1,311 @@
-# Introduction
+# Backend Structure Documentation
 
-The backend of our AI-Powered Lead Generation and Outreach Platform is the engine that powers the system’s core functionalities. It takes user input in everyday language, processes it using modern natural language processing techniques, and then coordinates a series of actions. From generating targeted search strategies to performing detailed website analyses and organizing leads, the backend ensures that all these tasks work together seamlessly. This document explains the structure we use to support these functions, highlighting the design choices and infrastructure components that ensure the system remains scalable, maintainable, and efficient.
+This document outlines the backend architecture and technical specifications of our AI-powered lead generation platform.
 
-# Backend Architecture
+# API Endpoints
 
-Our backend is built on Node.js with Express, a setup known for its simplicity and strong performance. The architecture follows common design patterns which make it easy to add new features or adjust existing ones as requirements change. By isolating business logic in middleware and controllers, the system remains well organized. This separation helps ensure that even as the amount of work increases, the code stays maintainable. The use of industry-proven methods allows us to handle varying loads efficiently, making sure that the application responds quickly even under heavy use.
+## Authentication Endpoints
+- POST /api/auth/register
+  - Register new user
+  - Create organization
+  - Send verification email
+  - Rate limit: 10/hour per IP
 
-# Database Management
+- POST /api/auth/login
+  - Email/password authentication
+  - Social auth providers
+  - Return JWT token
+  - Rate limit: 20/minute per IP
 
-Data is managed using Supabase, which leverages PostgreSQL to store and organize the valuable information gathered by the system. The database holds everything from user profiles and authentication tokens to lead details and website content. This structured approach allows data to be easily accessed, updated, and validated. Although row-level security (RLS) is disabled as per the project requirements, the database is still designed to be flexible and robust to support high volumes of data without compromising speed or functionality.
+- POST /api/auth/verify
+  - Verify email token
+  - Activate account
+  - Rate limit: 10/hour per email
 
-# API Design and Endpoints
+- POST /api/auth/reset-password
+  - Request password reset
+  - Send reset email
+  - Rate limit: 5/hour per email
 
-The platform uses RESTful APIs to allow smooth communication between the user interface and the backend. Each endpoint is designed to perform a specific function, whether that’s accepting user input, processing search queries, or returning analyzed lead data. For example, there is an endpoint for transforming plain-English business goals into detailed search strategies, while another endpoint handles crawling and processing website information. Additionally, integration endpoints are set up to communicate with third-party services like Brave Search, OpenAI, SendGrid or Mailgun, and Twilio, ensuring that each service contributes to the overall functionality without complicating the main system logic.
+## Search Endpoints
+- POST /api/search/goals
+  - Process business goals
+  - Generate search strategy
+  - Return search parameters
+  - Rate limit: 100/day per user
 
-# Hosting Solutions
+- GET /api/search/results
+  - Execute search strategy
+  - Filter and rank results
+  - Return paginated leads
+  - Rate limit: 1000/day per user
 
-The backend is hosted on a cloud-based infrastructure, which ensures high availability and the capacity to scale as the number of users grows. Using cloud providers helps keep the system reliable and makes it easier to deploy updates, ensuring continuous integration and smooth operations. This hosting solution also balances performance needs with cost-effectiveness, ensuring that the service runs well without unnecessary expense.
+- POST /api/search/validate
+  - Validate contact info
+  - Check email deliverability
+  - Rate limit: 5000/day per user
 
-# Infrastructure Components
+## Lead Management Endpoints
+- GET /api/leads
+  - List leads with filters
+  - Support pagination
+  - Include metadata
+  - Rate limit: 1000/hour per user
 
-Several infrastructure components work together to support the backend. Load balancers distribute incoming traffic, ensuring no single server bears too much load and that response times remain fast. Caching mechanisms are in place to reduce repeated processing and to speed up response times when users request similar data. Additionally, content delivery networks (CDNs) may be used for static assets, improving the user experience by minimizing load times. Together, these components streamline the system’s overall performance, ensuring that users always experience a responsive and reliable service.
+- POST /api/leads
+  - Create new lead
+  - Validate data
+  - Generate score
+  - Rate limit: 500/hour per user
 
-# Security Measures
+- PUT /api/leads/:id
+  - Update lead info
+  - Track changes
+  - Trigger notifications
+  - Rate limit: 1000/hour per user
 
-While the project removes some specific privacy features like row-level security, standard security practices remain essential. User authentication is performed using Supabase’s token-based system, which supports both email/password credentials and social sign-ons through providers such as Google and Facebook. In addition, data exchanged between the client and backend is encrypted and all API keys are managed securely. These measures ensure that even with some security constraints relaxed, the system remains robust against common threats and protects user information to a reasonable degree.
+## Campaign Endpoints
+- POST /api/campaigns
+  - Create campaign
+  - Set schedule
+  - Configure rules
+  - Rate limit: 100/day per user
 
-# Monitoring and Maintenance
+- POST /api/campaigns/:id/send
+  - Send campaign
+  - Track delivery
+  - Handle bounces
+  - Rate limit: 10000/day per user
 
-To keep the platform running smoothly, various monitoring tools track performance, uptime, and general health. Logs and metrics are collected continuously to quickly identify any issues. Automated alerts ensure that administrators are notified if something goes wrong, enabling rapid responses. Regular maintenance routines, including scheduled updates and performance audits, help the backend remain modern and efficient. These aspects are central to keeping the system reliable as it scales to meet growing demand.
+- GET /api/campaigns/:id/stats
+  - Get performance metrics
+  - Track engagement
+  - Generate reports
+  - Rate limit: 1000/hour per user
 
-# Conclusion and Overall Backend Summary
+## Analytics Endpoints
+- GET /api/analytics/overview
+  - Get summary metrics
+  - Calculate KPIs
+  - Generate insights
+  - Rate limit: 100/hour per user
 
-In summary, the backend is designed to be the robust heart of the AI-powered lead generation platform. Built on Node.js with Express, and supported by a well-structured Supabase database, it aligns with the project’s goals of efficiency and scalability. Its RESTful API design ensures smooth communication with the frontend and third-party integrations, while cloud-based hosting, load balancing, and caching mechanisms maintain excellent performance. Even with some relaxed security constraints, the use of token-based authentication and secure key management upholds a strong level of protection. Overall, every component of the backend is chosen and configured to efficiently turn everyday business goals into actionable outreach strategies, making the platform a powerful tool for generating and managing leads.
+- GET /api/analytics/reports
+  - Generate custom reports
+  - Export data
+  - Schedule reports
+  - Rate limit: 50/day per user
+
+# Database Schema
+
+## User Tables
+- auth.users
+  - Core auth fields
+  - Email verification
+  - Password hashing
+  - Session management
+
+- public.profiles
+  - User details
+  - Organization link
+  - Preferences
+  - UI settings
+
+- public.organizations
+  - Company info
+  - Subscription
+  - Team settings
+  - Billing details
+
+## Search Tables
+- public.search_goals
+  - Business goals
+  - Target market
+  - Location data
+  - Search history
+
+- public.search_results
+  - Raw results
+  - Ranking data
+  - Validation status
+  - Contact info
+
+## Lead Tables
+- public.leads
+  - Contact details
+  - Company info
+  - Lead score
+  - Status tracking
+
+- public.lead_interactions
+  - Communication log
+  - Follow-ups
+  - Notes
+  - Timeline
+
+## Campaign Tables
+- public.campaigns
+  - Campaign settings
+  - Schedule
+  - Templates
+  - Rules
+
+- public.campaign_stats
+  - Delivery metrics
+  - Engagement data
+  - Performance stats
+  - A/B results
+
+## Analytics Tables
+- public.metrics
+  - Raw metrics
+  - Aggregations
+  - Time series
+  - Benchmarks
+
+- public.reports
+  - Report configs
+  - Export history
+  - Custom views
+  - Schedules
+
+# External Services
+
+## Brave Search Integration
+- API Version: v1.0
+- Endpoint: https://api.search.brave.com/
+- Rate Limits: 100 requests/minute
+- Authentication: API key in header
+- Response Format: JSON
+- Error Handling: Retry with exponential backoff
+
+## OpenAI Integration
+- Model: GPT-4
+- Token Limit: 4096
+- Temperature: 0.7
+- Response Format: JSON
+- Streaming: Enabled
+- Error Handling: Fallback to GPT-3.5
+
+## Email Service Integration
+- Provider: SendGrid/Mailgun
+- API Version: Latest
+- Authentication: API key
+- Features:
+  - Bulk sending
+  - Template management
+  - Bounce handling
+  - Analytics tracking
+
+## Redis Integration
+- Version: 6.2+
+- Persistence: RDB + AOF
+- Replication: Master-Replica
+- Features:
+  - Caching
+  - Rate limiting
+  - Job queues
+  - Pub/Sub
+
+# Caching Strategy
+
+## Cache Layers
+- Browser Cache
+  - Static assets
+  - API responses
+  - User preferences
+  - TTL: 1 hour
+
+- Redis Cache
+  - Session data
+  - API results
+  - Search cache
+  - TTL: 24 hours
+
+- Database Cache
+  - Query results
+  - Aggregations
+  - Materialized views
+  - Refresh: Daily
+
+## Cache Invalidation
+- Time-based expiration
+- Event-based invalidation
+- Soft invalidation first
+- Hard invalidation fallback
+- Cache warming strategy
+
+## Cache Monitoring
+- Hit/miss ratios
+- Memory usage
+- Eviction rates
+- Response times
+- Cache size metrics
+
+# Error Handling
+
+## Error Types
+- Validation Errors
+  - Invalid input
+  - Missing fields
+  - Format errors
+  - Business rules
+
+- System Errors
+  - Database errors
+  - Service failures
+  - Network issues
+  - Resource limits
+
+- Integration Errors
+  - API failures
+  - Rate limits
+  - Auth errors
+  - Timeout issues
+
+## Error Responses
+- Standard Format
+  ```json
+  {
+    "error": {
+      "code": "string",
+      "message": "string",
+      "details": "object",
+      "requestId": "string"
+    }
+  }
+  ```
+
+- HTTP Status Codes
+  - 400: Bad Request
+  - 401: Unauthorized
+  - 403: Forbidden
+  - 404: Not Found
+  - 429: Too Many Requests
+  - 500: Server Error
+
+## Error Logging
+- Log Levels
+  - DEBUG: Development info
+  - INFO: Normal operations
+  - WARN: Potential issues
+  - ERROR: System problems
+  - FATAL: Critical failures
+
+- Log Format
+  ```json
+  {
+    "timestamp": "ISO8601",
+    "level": "string",
+    "service": "string",
+    "message": "string",
+    "metadata": "object",
+    "stackTrace": "string"
+  }
+  ```
+
+- Monitoring
+  - Real-time alerts
+  - Error aggregation
+  - Trend analysis
+  - Performance impact
