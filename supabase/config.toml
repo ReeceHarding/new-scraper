@@ -31,16 +31,32 @@ shadow_port = 54320
 major_version = 15
 
 [db.pooler]
-enabled = false
+enabled = true
 # Port to use for the local connection pooler.
 port = 54329
 # Specifies when a server connection can be reused by other clients.
 # Configure one of the supported pooler modes: `transaction`, `session`.
 pool_mode = "transaction"
 # How many server connections to allow per user/database pair.
-default_pool_size = 20
+default_pool_size = 50
 # Maximum number of client connections allowed.
-max_client_conn = 100
+max_client_conn = 200
+# Minimum number of server connections to keep in the pool
+min_pool_size = 10
+# Maximum time in seconds a connection can remain idle before being closed
+max_client_idle_time = "300"
+# Maximum time in seconds a connection can be used before being recycled
+max_db_connections_lifetime = "3600"
+# Time to wait in milliseconds for a server connection to become available
+server_connect_timeout = "3000"
+# Time to wait in milliseconds for a client to provide authentication data
+auth_timeout = "3000"
+# Time to wait in milliseconds for any activity from a client
+client_idle_timeout = "600000"
+# Time to wait in milliseconds for a server to respond to a query
+query_timeout = "60000"
+# Maximum number of connection attempts per host
+max_connection_retries = 3
 
 [db.seed]
 # If enabled, seeds the database after migrations during a db reset.

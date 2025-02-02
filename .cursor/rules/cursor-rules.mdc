@@ -1,0 +1,58 @@
+---
+description: giving guideliens for how code should be implemented. input this for every prompt
+globs: 
+---
+# .cursorrules
+
+## Project Overview
+
+*   **Type:** cursorrules_file
+*   **Description:** AI-Powered Lead Generation and Outreach Platform – An intelligent, automated platform that helps businesses convert natural language business goals into targeted search strategies, analyze websites, extract contact information, and automate personalized outreach.
+*   **Primary Goal:** Build an end-to-end system that transforms user-entered business goals into actionable lead generation and outreach campaigns, ensuring streamlined, measurable, and pay-per-lead client acquisition.
+
+## Project Structure
+
+### Framework-Specific Routing
+
+*   **Directory Rules:**
+
+    *   React Router 6: Utilize a client-side routing structure under `src/routes/` with `createBrowserRouter`.
+    *   Example 1: "React Router 6" → `src/routes/` directory containing route definitions and lazy-loaded components.
+    *   Example 2: Main router integrated in `src/App.js` to manage the overall layout and navigation.
+
+### Core Directories
+
+*   **Versioned Structure:**
+
+    *   src/views: Contains versioned React components implementing core functionalities such as dashboard, authentication, and goal entry.
+    *   Example 1: `src/views/dashboard` → "Components for displaying analytics and lead organization."
+    *   Example 2: `src/views/auth` → "Components for user login, signup, and account management."
+
+### Key Files
+
+*   **Stack-Versioned Patterns:**
+
+    *   src/index.js: Bootstraps the React application and mounts the root component.
+    *   Example 1: `src/App.js` → "Main application layout integrating React Router 6 for route management."
+    *   Example 2: `src/routes/MainRoutes.jsx` → "Defines route configurations using React Router 6 patterns."
+
+## Tech Stack Rules
+
+*   **Version Enforcement:**
+
+    *   node@14: "Backend services are built using Node.js (v14 LTS) with Express (e.g., express@4) to handle robust API operations."
+    *   react@18: "Frontend is developed using React (v18) and React Router 6 for modern, component-based UI routing."
+    *   supabase@latest: "Supabase is utilized for PostgreSQL-based storage and token-based user authentication, with row-level security explicitly disabled."
+    *   openai@latest: "OpenAI API integration is used for natural language processing and smart query generation."
+
+## PRD Compliance
+
+*   **Non-Negotiable:**
+
+    *   "Row-level security (RLS) is disabled as per requirements": "All data handling disregards granular user-specific access controls in alignment with project constraints."
+
+## App Flow Integration
+
+*   **Stack-Aligned Flow:**
+
+    *   Example: "React Auth Flow → `src/views/auth/Login.jsx` implements secure, token-based authentication via Supabase, while `src/views/goal/GoalEntry.jsx` provides a single-page interface for entering business goals which triggers the lead generation process."

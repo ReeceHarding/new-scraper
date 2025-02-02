@@ -480,5 +480,61 @@ ALTER TABLE public.crawled_pages         DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.job_queue             DISABLE ROW LEVEL SECURITY;
 
 --------------------------------------------------------------------------------
+-- TEST DATABASE MANAGEMENT FUNCTIONS
+--------------------------------------------------------------------------------
+
+CREATE OR REPLACE FUNCTION public.reset_test_db()
+RETURNS void AS $$
+BEGIN
+  -- Delete all data from tables in reverse order of dependencies
+  TRUNCATE TABLE public.job_queue CASCADE;
+  TRUNCATE TABLE public.crawled_pages CASCADE;
+  TRUNCATE TABLE public.api_keys CASCADE;
+  TRUNCATE TABLE public.usage_logs CASCADE;
+  TRUNCATE TABLE public.unsubscribes CASCADE;
+  TRUNCATE TABLE public.inbound_attachments CASCADE;
+  TRUNCATE TABLE public.inbound_messages CASCADE;
+  TRUNCATE TABLE public.outreach_contacts CASCADE;
+  TRUNCATE TABLE public.outreach_companies CASCADE;
+  TRUNCATE TABLE public.outreach_campaigns CASCADE;
+  TRUNCATE TABLE public.knowledge_doc_chunks CASCADE;
+  TRUNCATE TABLE public.knowledge_docs CASCADE;
+  TRUNCATE TABLE public.organization_members CASCADE;
+  TRUNCATE TABLE public.profiles CASCADE;
+  TRUNCATE TABLE public.organizations CASCADE;
+  
+  -- Reset sequences
+  ALTER SEQUENCE IF EXISTS public.job_queue_id_seq RESTART;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION public.cleanup_test_db()
+RETURNS void AS $$
+BEGIN
+  -- Only clean up data created during tests
+  DELETE FROM public.job_queue 
+  WHERE created_at > NOW() - INTERVAL '1 hour';
+  
+  DELETE FROM public.organizations 
+  WHERE name LIKE 'Test Organization%'
+  AND created_at > NOW() - INTERVAL '1 hour';
+  
+  -- Clean up test users from auth schema
+  DELETE FROM auth.users 
+  WHERE email LIKE 'test-%@example.com'
+  AND created_at > NOW() - INTERVAL '1 hour';
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION public.run_migrations()
+RETURNS void AS $$
+BEGIN
+  -- Run all migrations in order
+  -- This is handled by the migration system, but we need the function to exist
+  RETURN;
+END;
+$$ LANGUAGE plpgsql;
+
+--------------------------------------------------------------------------------
 -- DONE: Final, Massive Supabase Schema
 --------------------------------------------------------------------------------
