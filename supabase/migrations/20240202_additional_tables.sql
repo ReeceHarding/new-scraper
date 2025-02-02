@@ -194,6 +194,36 @@ ALTER TABLE public.job_queue DISABLE ROW LEVEL SECURITY;
 
 CREATE INDEX idx_job_queue_status_priority ON public.job_queue (status, priority DESC);
 
+-- Create user_profiles table
+CREATE TABLE IF NOT EXISTS user_profiles (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID NOT NULL,
+  full_name TEXT,
+  company_name TEXT,
+  industry TEXT,
+  website TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE
+);
+
+-- Create index on user_id for faster lookups
+CREATE INDEX IF NOT EXISTS idx_user_profiles_user_id ON user_profiles(user_id);
+
+-- Create trigger to update updated_at timestamp
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = CURRENT_TIMESTAMP;
+  RETURN NEW;
+END;
+$$ language 'plpgsql';
+
+CREATE TRIGGER update_user_profiles_updated_at
+  BEFORE UPDATE ON user_profiles
+  FOR EACH ROW
+  EXECUTE FUNCTION update_updated_at_column();
+
 --------------------------------------------------------------------------------
 -- 2) GRANT PERMISSIONS
 --------------------------------------------------------------------------------
