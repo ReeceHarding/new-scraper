@@ -26,7 +26,7 @@ This implementation plan is generated based on the Documentation files in the pr
    - Lead management interface
    - Email template generation
    - Analytics dashboard layout
-[] Create detailed user journey maps for:
+[x] Create detailed user journey maps for:
    - New user onboarding
    - Business goal submission
    - Search result review
