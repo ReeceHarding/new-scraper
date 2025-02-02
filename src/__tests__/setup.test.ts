@@ -1,6 +1,5 @@
 import fs from 'fs';
 import path from 'path';
-import { execSync } from 'child_process';
 
 describe('Development Environment Setup', () => {
   const rootDir = process.cwd();

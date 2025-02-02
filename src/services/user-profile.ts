@@ -1,22 +1,34 @@
 import { SupabaseClient } from '@supabase/supabase-js';
-import logger from './logger';
+import logger from './server-logger';
 
 export interface UserProfile {
   id: string;
-  user_id: string;
+  email: string;
+  display_name?: string;
+  role: string;
   full_name?: string;
   company_name?: string;
   industry?: string;
   website?: string;
+  phone_number?: string;
+  time_zone?: string;
+  status: string;
+  ui_settings: Record<string, any>;
+  metadata: Record<string, any>;
   created_at: string;
   updated_at: string;
 }
 
 export interface UpdateProfileData {
+  display_name?: string;
   full_name?: string;
   company_name?: string;
   industry?: string;
   website?: string;
+  phone_number?: string;
+  time_zone?: string;
+  ui_settings?: Record<string, any>;
+  metadata?: Record<string, any>;
 }
 
 export interface UserProfileService {
@@ -32,43 +44,45 @@ export class SupabaseUserProfileService implements UserProfileService {
   async getProfile(userId: string): Promise<UserProfile | null> {
     try {
       const { data, error } = await this.client
-        .from('user_profiles')
+        .from('profiles')
         .select('*')
-        .eq('user_id', userId)
+        .eq('id', userId)
         .single();
 
       if (error) {
-        logger.error(error);
+        logger.error(error.message, error);
         throw error;
       }
 
       return data;
     } catch (error) {
-      logger.error(error instanceof Error ? error : new Error(String(error)));
-      throw error;
+      const errorToLog = error instanceof Error ? error : new Error(String(error));
+      logger.error(errorToLog.message, errorToLog);
+      throw errorToLog;
     }
   }
 
   async updateProfile(userId: string, data: UpdateProfileData): Promise<UserProfile> {
     try {
       const { data: profile, error } = await this.client
-        .from('user_profiles')
+        .from('profiles')
         .update({
           ...data,
           updated_at: new Date().toISOString(),
         })
-        .eq('user_id', userId)
+        .eq('id', userId)
         .select()
         .single();
 
       if (error) {
-        logger.error(error);
+        logger.error(error.message, error);
         throw error;
       }
 
       return profile;
     } catch (error) {
-      logger.error(error instanceof Error ? error : new Error(String(error)));
+      const errorToLog = error instanceof Error ? error : new Error(String(error));
+      logger.error(errorToLog.message, errorToLog);
       throw error;
     }
   }
@@ -76,9 +90,13 @@ export class SupabaseUserProfileService implements UserProfileService {
   async createProfile(userId: string, data: UpdateProfileData): Promise<UserProfile> {
     try {
       const { data: profile, error } = await this.client
-        .from('user_profiles')
+        .from('profiles')
         .insert({
-          user_id: userId,
+          id: userId,
+          role: 'user',
+          status: 'active',
+          ui_settings: {},
+          metadata: {},
           ...data,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
@@ -87,13 +105,14 @@ export class SupabaseUserProfileService implements UserProfileService {
         .single();
 
       if (error) {
-        logger.error(error);
+        logger.error(error.message, error);
         throw error;
       }
 
       return profile;
     } catch (error) {
-      logger.error(error instanceof Error ? error : new Error(String(error)));
+      const errorToLog = error instanceof Error ? error : new Error(String(error));
+      logger.error(errorToLog.message, errorToLog);
       throw error;
     }
   }
@@ -101,16 +120,18 @@ export class SupabaseUserProfileService implements UserProfileService {
   async deleteProfile(userId: string): Promise<void> {
     try {
       const { error } = await this.client
-        .from('user_profiles')
+        .from('profiles')
         .delete()
-        .eq('user_id', userId);
+        .eq('id', userId)
+        .single();
 
       if (error) {
-        logger.error(error);
+        logger.error(error.message, error);
         throw error;
       }
     } catch (error) {
-      logger.error(error instanceof Error ? error : new Error(String(error)));
+      const errorToLog = error instanceof Error ? error : new Error(String(error));
+      logger.error(errorToLog.message, errorToLog);
       throw error;
     }
   }

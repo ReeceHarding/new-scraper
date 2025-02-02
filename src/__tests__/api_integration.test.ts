@@ -1,4 +1,3 @@
-import { createClient } from '@supabase/supabase-js'
 import axios from 'axios'
 import dotenv from 'dotenv'
 
@@ -95,7 +94,7 @@ describe('External API Integration Tests', () => {
       TWILIO_RATE_LIMIT: process.env.TWILIO_RATE_LIMIT
     }
     
-    Object.entries(rateLimits).forEach(([key, value]) => {
+    Object.entries(rateLimits).forEach(([_key, value]) => {
       expect(value).toBeDefined()
       expect(parseInt(value || '0')).toBeGreaterThan(0)
     })
@@ -108,7 +107,7 @@ describe('External API Integration Tests', () => {
       API_LATENCY_THRESHOLD: process.env.API_LATENCY_THRESHOLD
     }
     
-    Object.entries(monitoringConfig).forEach(([key, value]) => {
+    Object.entries(monitoringConfig).forEach(([_key, value]) => {
       expect(value).toBeDefined()
     })
     

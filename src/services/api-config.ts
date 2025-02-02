@@ -1,6 +1,5 @@
 import axios, { AxiosResponse, AxiosError, InternalAxiosRequestConfig } from 'axios'
 import rateLimit from 'axios-rate-limit'
-import { createClient } from '@supabase/supabase-js'
 
 interface ApiConfig {
   baseURL: string
@@ -145,4 +144,4 @@ class ApiConfigService {
 }
 
 export const apiConfig = ApiConfigService.getInstance()
-export default apiConfig 
+export default apiConfig
