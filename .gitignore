@@ -6,3 +6,9 @@ node_modules/
 logs/
 *.log
 *.log.*
+test-logs/
+api-failed-logs.json
+
+# Build files
+dist/
+build/
