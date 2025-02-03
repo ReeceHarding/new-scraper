@@ -50,15 +50,22 @@ export class SupabaseUserProfileService implements UserProfileService {
         .single();
 
       if (error) {
-        logger.error(error.message, error);
-        throw error;
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        logger.error('Failed to fetch profile', error, {});
+        throw error instanceof Error ? error : new Error(errorMessage);
+      }
+
+      if (!data) {
+        const err = new Error('Profile not found');
+        logger.error(err.message, err, {});
+        throw err;
       }
 
       return data;
     } catch (error) {
-      const errorToLog = error instanceof Error ? error : new Error(String(error));
-      logger.error(errorToLog.message, errorToLog);
-      throw errorToLog;
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error('Failed to fetch profile', error, {});
+      throw error instanceof Error ? error : new Error(errorMessage);
     }
   }
 
@@ -75,15 +82,22 @@ export class SupabaseUserProfileService implements UserProfileService {
         .single();
 
       if (error) {
-        logger.error(error.message, error);
-        throw error;
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        logger.error(errorMessage, error, {});
+        throw error instanceof Error ? error : new Error(errorMessage);
+      }
+
+      if (!profile) {
+        const err = new Error('Profile not found');
+        logger.error(err.message, err, {});
+        throw err;
       }
 
       return profile;
     } catch (error) {
-      const errorToLog = error instanceof Error ? error : new Error(String(error));
-      logger.error(errorToLog.message, errorToLog);
-      throw error;
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error(errorMessage, error, {});
+      throw error instanceof Error ? error : new Error(errorMessage);
     }
   }
 
@@ -105,15 +119,22 @@ export class SupabaseUserProfileService implements UserProfileService {
         .single();
 
       if (error) {
-        logger.error(error.message, error);
-        throw error;
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        logger.error(errorMessage, error, {});
+        throw error instanceof Error ? error : new Error(errorMessage);
+      }
+
+      if (!profile) {
+        const err = new Error('Failed to create profile');
+        logger.error(err.message, err, {});
+        throw err;
       }
 
       return profile;
     } catch (error) {
-      const errorToLog = error instanceof Error ? error : new Error(String(error));
-      logger.error(errorToLog.message, errorToLog);
-      throw error;
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error(errorMessage, error, {});
+      throw error instanceof Error ? error : new Error(errorMessage);
     }
   }
 
@@ -122,17 +143,17 @@ export class SupabaseUserProfileService implements UserProfileService {
       const { error } = await this.client
         .from('profiles')
         .delete()
-        .eq('id', userId)
-        .single();
+        .eq('id', userId);
 
       if (error) {
-        logger.error(error.message, error);
-        throw error;
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        logger.error(errorMessage, error, {});
+        throw error instanceof Error ? error : new Error(errorMessage);
       }
     } catch (error) {
-      const errorToLog = error instanceof Error ? error : new Error(String(error));
-      logger.error(errorToLog.message, errorToLog);
-      throw error;
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error(errorMessage, error, {});
+      throw error instanceof Error ? error : new Error(errorMessage);
     }
   }
 }

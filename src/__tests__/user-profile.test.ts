@@ -1,82 +1,61 @@
 import { SupabaseClient } from '@supabase/supabase-js';
+import { SupabaseUserProfileService, UserProfile } from '../services/user-profile';
 import logger from '../services/server-logger';
-import { SupabaseUserProfileService } from '../services/user-profile';
 
-jest.mock('../services/server-logger', () => ({
-  error: jest.fn(),
-  info: jest.fn(),
-  setTestMode: jest.fn(),
-  clearErrorCount: jest.fn(),
-}));
+jest.mock('../services/server-logger');
 
 describe('UserProfileService', () => {
   let userProfileService: SupabaseUserProfileService;
-  let mockClient: { from: jest.Mock };
-  let mockQueryBuilder: {
-    select: jest.Mock;
-    insert: jest.Mock;
-    update: jest.Mock;
-    delete: jest.Mock;
-    eq: jest.Mock;
-    single: jest.Mock;
-  };
+  let mockSupabaseClient: jest.Mocked<SupabaseClient>;
 
   beforeEach(() => {
-    mockQueryBuilder = {
-      select: jest.fn(),
-      insert: jest.fn(),
-      update: jest.fn(),
-      delete: jest.fn(),
-      eq: jest.fn(),
-      single: jest.fn(),
-    };
+    const mockSingle = jest.fn();
+    const mockEq = jest.fn().mockReturnValue({ single: mockSingle });
+    const mockSelect = jest.fn().mockReturnValue({ eq: mockEq });
+    const mockUpdate = jest.fn().mockReturnValue({ eq: mockEq });
+    const mockInsert = jest.fn().mockReturnValue({ select: mockSelect });
+    const mockDelete = jest.fn().mockReturnValue({ eq: mockEq });
 
-    // Set up the chain of mock functions
-    mockQueryBuilder.select.mockReturnValue({ eq: mockQueryBuilder.eq, single: mockQueryBuilder.single });
-    mockQueryBuilder.eq.mockReturnValue({ single: mockQueryBuilder.single });
+    mockSupabaseClient = {
+      from: jest.fn().mockImplementation(() => ({
+        select: mockSelect,
+        update: mockUpdate,
+        insert: mockInsert,
+        delete: mockDelete,
+      })),
+    } as unknown as jest.Mocked<SupabaseClient>;
 
-    // Set up nested returns for update chain
-    mockQueryBuilder.update.mockReturnValue({
-      eq: jest.fn().mockReturnValue({
-        select: jest.fn().mockReturnValue({
-          single: mockQueryBuilder.single
-        })
-      })
-    });
-
-    // Set up nested returns for insert chain
-    mockQueryBuilder.insert.mockReturnValue({
-      select: jest.fn().mockReturnValue({
-        single: mockQueryBuilder.single
-      })
-    });
-
-    // Set up nested returns for delete chain
-    mockQueryBuilder.delete.mockReturnValue({
-      eq: jest.fn().mockReturnValue({
-        single: mockQueryBuilder.single
-      })
-    });
-
-    mockClient = {
-      from: jest.fn().mockReturnValue(mockQueryBuilder),
-    };
-
-    userProfileService = new SupabaseUserProfileService(mockClient as unknown as SupabaseClient);
+    userProfileService = new SupabaseUserProfileService(mockSupabaseClient);
+    (logger.error as jest.Mock).mockClear();
   });
 
   describe('getProfile', () => {
     it('should return user profile when found', async () => {
-      const mockProfile = {
+      const mockProfile: UserProfile = {
         id: 'user123',
         email: 'test@example.com',
         role: 'user',
         status: 'active',
+        ui_settings: {},
+        metadata: {},
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
 
-      mockQueryBuilder.single.mockResolvedValueOnce({ data: mockProfile, error: null });
+      const mockSingle = jest.fn().mockResolvedValueOnce({
+        data: mockProfile,
+        error: null,
+      });
+
+      const mockChain = {
+        select: () => ({
+          eq: () => ({
+            single: mockSingle
+          })
+        })
+      };
+
+      (mockSupabaseClient.from as jest.Mock).mockImplementation(() => mockChain);
 
       const result = await userProfileService.getProfile('user123');
       expect(result).toEqual(mockProfile);
@@ -84,7 +63,20 @@ describe('UserProfileService', () => {
 
     it('should throw error when profile fetch fails', async () => {
       const mockError = new Error('Failed to fetch profile');
-      mockQueryBuilder.single.mockResolvedValueOnce({ data: null, error: mockError });
+      const mockSingle = jest.fn().mockResolvedValueOnce({
+        data: null,
+        error: mockError,
+      });
+
+      const mockChain = {
+        select: () => ({
+          eq: () => ({
+            single: mockSingle
+          })
+        })
+      };
+
+      (mockSupabaseClient.from as jest.Mock).mockImplementation(() => mockChain);
 
       await expect(userProfileService.getProfile('user123')).rejects.toThrow(mockError);
     });
@@ -93,21 +85,37 @@ describe('UserProfileService', () => {
   describe('updateProfile', () => {
     it('should update and return user profile', async () => {
       const updateData = {
-        display_name: 'Test User',
-        full_name: 'Test User Full',
+        display_name: 'New Name',
       };
 
-      const mockUpdatedProfile = {
+      const mockUpdatedProfile: UserProfile = {
         id: 'user123',
-        ...updateData,
         email: 'test@example.com',
+        display_name: 'New Name',
         role: 'user',
         status: 'active',
+        ui_settings: {},
+        metadata: {},
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
 
-      mockQueryBuilder.single.mockResolvedValueOnce({ data: mockUpdatedProfile, error: null });
+      const mockSingle = jest.fn().mockResolvedValueOnce({
+        data: mockUpdatedProfile,
+        error: null,
+      });
+
+      const mockChain = {
+        update: () => ({
+          eq: () => ({
+            select: () => ({
+              single: mockSingle
+            })
+          })
+        })
+      };
+
+      (mockSupabaseClient.from as jest.Mock).mockImplementation(() => mockChain);
 
       const result = await userProfileService.updateProfile('user123', updateData);
       expect(result).toEqual(mockUpdatedProfile);
@@ -115,7 +123,22 @@ describe('UserProfileService', () => {
 
     it('should throw error when update fails', async () => {
       const mockError = new Error('Failed to update profile');
-      mockQueryBuilder.single.mockResolvedValueOnce({ data: null, error: mockError });
+      const mockSingle = jest.fn().mockResolvedValueOnce({
+        data: null,
+        error: mockError,
+      });
+
+      const mockChain = {
+        update: () => ({
+          eq: () => ({
+            select: () => ({
+              single: mockSingle
+            })
+          })
+        })
+      };
+
+      (mockSupabaseClient.from as jest.Mock).mockImplementation(() => mockChain);
 
       await expect(userProfileService.updateProfile('user123', {})).rejects.toThrow(mockError);
     });
@@ -125,20 +148,34 @@ describe('UserProfileService', () => {
     it('should create and return user profile', async () => {
       const createData = {
         display_name: 'New User',
-        full_name: 'New User Full',
       };
 
-      const mockCreatedProfile = {
+      const mockCreatedProfile: UserProfile = {
         id: 'user123',
-        ...createData,
         email: 'test@example.com',
+        display_name: 'New User',
         role: 'user',
         status: 'active',
+        ui_settings: {},
+        metadata: {},
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
 
-      mockQueryBuilder.single.mockResolvedValueOnce({ data: mockCreatedProfile, error: null });
+      const mockSingle = jest.fn().mockResolvedValueOnce({
+        data: mockCreatedProfile,
+        error: null,
+      });
+
+      const mockChain = {
+        insert: () => ({
+          select: () => ({
+            single: mockSingle
+          })
+        })
+      };
+
+      (mockSupabaseClient.from as jest.Mock).mockImplementation(() => mockChain);
 
       const result = await userProfileService.createProfile('user123', createData);
       expect(result).toEqual(mockCreatedProfile);
@@ -146,7 +183,20 @@ describe('UserProfileService', () => {
 
     it('should throw error when creation fails', async () => {
       const mockError = new Error('Failed to create profile');
-      mockQueryBuilder.single.mockResolvedValueOnce({ data: null, error: mockError });
+      const mockSingle = jest.fn().mockResolvedValueOnce({
+        data: null,
+        error: mockError,
+      });
+
+      const mockChain = {
+        insert: () => ({
+          select: () => ({
+            single: mockSingle
+          })
+        })
+      };
+
+      (mockSupabaseClient.from as jest.Mock).mockImplementation(() => mockChain);
 
       await expect(userProfileService.createProfile('user123', {})).rejects.toThrow(mockError);
     });
@@ -154,71 +204,132 @@ describe('UserProfileService', () => {
 
   describe('deleteProfile', () => {
     it('should delete user profile successfully', async () => {
-      mockQueryBuilder.single.mockResolvedValueOnce({ error: null });
+      const mockDelete = jest.fn().mockResolvedValueOnce({
+        error: null,
+      });
+
+      const mockChain = {
+        delete: () => ({
+          eq: () => mockDelete
+        })
+      };
+
+      (mockSupabaseClient.from as jest.Mock).mockImplementation(() => mockChain);
 
       await expect(userProfileService.deleteProfile('user123')).resolves.not.toThrow();
     });
 
     it('should throw error when deletion fails', async () => {
       const mockError = new Error('Failed to delete profile');
-      mockQueryBuilder.single.mockResolvedValueOnce({ error: mockError });
+      const mockDelete = jest.fn().mockResolvedValueOnce({
+        data: null,
+        error: mockError
+      });
+
+      const mockChain = {
+        delete: () => ({
+          eq: () => mockDelete()
+        })
+      };
+
+      (mockSupabaseClient.from as jest.Mock).mockImplementation(() => mockChain);
 
       await expect(userProfileService.deleteProfile('user123')).rejects.toThrow(mockError);
     });
   });
 
   describe('error handling', () => {
-    beforeEach(() => {
-      logger.setTestMode(true);
-    });
-
-    afterEach(() => {
-      logger.setTestMode(false);
-    });
-
     it('handles non-Error objects in catch blocks', async () => {
-      const nonErrorObject = { message: 'Not an Error instance' };
-      mockQueryBuilder.select.mockImplementationOnce(() => {
-        throw nonErrorObject;
+      const mockError = { message: 'Failed to fetch profile' };
+      const mockSingle = jest.fn().mockResolvedValueOnce({
+        data: null,
+        error: mockError
       });
+
+      const mockChain = {
+        select: () => ({
+          eq: () => ({
+            single: mockSingle
+          })
+        })
+      };
+
+      (mockSupabaseClient.from as jest.Mock).mockImplementation(() => mockChain);
 
       await expect(userProfileService.getProfile('123')).rejects.toThrow();
       expect(logger.error).toHaveBeenCalledWith(
-        'Failed to fetch profile',
-        expect.any(Error)
+        String(mockError.message),
+        expect.any(Error),
+        {}
       );
     });
 
     it('handles database errors in profile creation', async () => {
       const mockError = new Error('Database error');
-      mockQueryBuilder.single.mockResolvedValueOnce({ error: mockError });
+      const mockSingle = jest.fn().mockRejectedValueOnce(mockError);
+
+      const mockChain = {
+        insert: () => ({
+          select: () => ({
+            single: mockSingle
+          })
+        })
+      };
+
+      (mockSupabaseClient.from as jest.Mock).mockImplementation(() => mockChain);
 
       await expect(userProfileService.createProfile('123', {})).rejects.toThrow(mockError);
       expect(logger.error).toHaveBeenCalledWith(
         mockError.message,
-        mockError
+        mockError,
+        {}
       );
     });
 
     it('handles database errors in profile update', async () => {
       const mockError = new Error('Update error');
-      mockQueryBuilder.single.mockResolvedValueOnce({ error: mockError });
+      const mockSingle = jest.fn().mockRejectedValueOnce(mockError);
+
+      const mockChain = {
+        update: () => ({
+          eq: () => ({
+            select: () => ({
+              single: mockSingle
+            })
+          })
+        })
+      };
+
+      (mockSupabaseClient.from as jest.Mock).mockImplementation(() => mockChain);
 
       await expect(userProfileService.updateProfile('123', {})).rejects.toThrow(mockError);
       expect(logger.error).toHaveBeenCalledWith(
         mockError.message,
-        mockError
+        mockError,
+        {}
       );
     });
 
     it('handles database errors in profile deletion', async () => {
       const mockError = new Error('Deletion error');
-      mockQueryBuilder.single.mockResolvedValueOnce({ error: mockError });
+      const mockDelete = jest.fn().mockResolvedValueOnce({
+        data: null,
+        error: mockError
+      });
+
+      const mockChain = {
+        delete: () => ({
+          eq: () => mockDelete()
+        })
+      };
+
+      (mockSupabaseClient.from as jest.Mock).mockImplementation(() => mockChain);
 
       await expect(userProfileService.deleteProfile('123')).rejects.toThrow(mockError);
       expect(logger.error).toHaveBeenCalledWith(
         mockError.message,
-        mockError
+        mockError,
+        {}
       );
     });
   });

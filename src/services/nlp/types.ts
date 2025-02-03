@@ -32,6 +32,17 @@ export interface SearchStrategy {
   };
   industry?: string;
   confidence: number;
+  ranking: {
+    relevanceFactors: Array<{
+      name: string;
+      weight: number;
+    }>;
+    boostFactors: {
+      hasWebsite: number;
+      hasContactInfo: number;
+      isVerifiedBusiness: number;
+    };
+  };
 }
 
 export interface NLPServiceConfig {

@@ -1,5 +1,5 @@
 import path from 'path'
-import * as fs from 'fs/promises'
+import * as _fs from 'fs/promises'
 import { ServerLogger } from '../services/server-logger'
 import fetch from 'node-fetch'
 import type { PathLike, Stats, Dirent } from 'fs'
@@ -69,10 +69,10 @@ describe('Logging Infrastructure', () => {
 
   it('log file rotation works when file exceeds size limit', async () => {
     const _logPath = path.join(logger.getLogDir(), 'app.log')
-    const largeMessage = 'x'.repeat(1024 * 1024 + 1) // Slightly over 1MB
+    const _largeMessage = 'x'.repeat(1024 * 1024 + 1) // Slightly over 1MB
     
     // Write a large message to trigger rotation
-    await logger.info(largeMessage)
+    await logger.info(_largeMessage)
     await logger.info('Another test message')
     await logger.waitForWrites()
 
@@ -95,7 +95,7 @@ describe('Logging Infrastructure', () => {
     expect(alertLog).toBeDefined()
     expect(alertLog).toMatchObject({
       type: 'alert',
-      level: 'error',
+      level: 'alert',
       message: expect.stringContaining('Error threshold exceeded')
     })
   })
@@ -120,10 +120,10 @@ describe('Logging Infrastructure', () => {
 
   it('log rotation is configured', async () => {
     const _logPath = path.join(logger.getLogDir(), 'error.log')
-    const largeMessage = 'x'.repeat(1024 * 1024 + 1) // Slightly over 1MB
+    const _largeMessage = 'x'.repeat(1024 * 1024 + 1) // Slightly over 1MB
     
     // Write a large message to trigger rotation
-    await logger.error(largeMessage)
+    await logger.error(_largeMessage)
     await logger.error('Another test message')
     await logger.waitForWrites()
 
@@ -200,7 +200,7 @@ describe('Logging Infrastructure', () => {
 
   it('log rotation works with multiple files', async () => {
     const _logPath = path.join(logger.getLogDir(), 'app.log')
-    const largeMessage = 'x'.repeat(1024 * 1024 + 1) // Slightly over 1MB
+    const _largeMessage = 'x'.repeat(1024 * 1024 + 1) // Slightly over 1MB
 
     // Write messages to trigger rotation
     await logger.info('Test message 1')
@@ -261,7 +261,7 @@ describe('Logging Infrastructure', () => {
     expect(alertLog).toBeDefined()
     expect(alertLog).toMatchObject({
       type: 'alert',
-      level: 'error',
+      level: 'alert',
       message: expect.stringContaining('Error threshold exceeded')
     })
   })
@@ -332,7 +332,7 @@ describe('Alert Notifications', () => {
     expect(alertLog).toBeDefined()
     expect(alertLog).toMatchObject({
       type: 'alert',
-      level: 'error',
+      level: 'alert',
       message: expect.stringContaining('Error threshold exceeded')
     })
   })
