@@ -258,18 +258,28 @@ Return as JSON object with filter parameters.`;
         }
       }
 
-      // Combine everything into a search strategy
-      const strategy: SearchStrategy = {
-        queries: queries.map(q => q.trim()),
-        filters: {
-          intent: intent.type,
-          ...intent.parameters,
-          ...industryFilters
-        },
-        industry: context.industry,
-        confidence: intent.confidence,
-        locationBias: locationBias || undefined,
-        ranking: {
+      // Generate ranking configuration
+      const rankingPrompt = `Generate ranking configuration for the following context:
+Business Goal: ${context.businessGoal}
+Industry: ${context.industry || 'any'}
+Location: ${context.location || 'any'}
+
+Return a JSON object with:
+1. relevanceFactors: array of { name: string, weight: number } where weights sum to 1
+2. boostFactors: object with hasWebsite, hasContactInfo, isVerifiedBusiness multipliers`;
+
+      const rankingResponse = await this.callOpenAI(
+        rankingPrompt,
+        SYSTEM_PROMPTS.rankingConfiguration,
+        0.3
+      );
+
+      let ranking;
+      try {
+        ranking = JSON.parse(rankingResponse);
+      } catch (e) {
+        this.logger.warn('Failed to parse ranking configuration:', e);
+        ranking = {
           relevanceFactors: [
             { name: 'intentMatch', weight: 0.3 },
             { name: 'locationProximity', weight: context.location ? 0.3 : 0 },
@@ -281,7 +291,21 @@ Return as JSON object with filter parameters.`;
             hasContactInfo: 1.3,
             isVerifiedBusiness: 1.5
           }
-        }
+        };
+      }
+
+      // Combine everything into a search strategy
+      const strategy: SearchStrategy = {
+        queries: queries.map(q => q.trim()),
+        filters: {
+          intent: intent.type,
+          ...intent.parameters,
+          ...industryFilters
+        },
+        industry: context.industry,
+        confidence: intent.confidence,
+        locationBias: locationBias || undefined,
+        ranking
       };
 
       // Cache the generated strategy

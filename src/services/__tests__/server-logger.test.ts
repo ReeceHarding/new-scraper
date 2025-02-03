@@ -94,7 +94,8 @@ describe('ServerLogger', () => {
   });
 
   it('log file rotation works when file exceeds size limit', async () => {
-    const largeMessage = 'x'.repeat(200);
+    // Create a message larger than MAX_LOG_SIZE (1MB)
+    const largeMessage = 'x'.repeat(1024 * 1024 + 1);
     await logger.info(largeMessage);
     const rotatedFiles = logger.getRotatedFiles();
     expect(rotatedFiles.length).toBeGreaterThan(0);
@@ -107,8 +108,7 @@ describe('ServerLogger', () => {
     }
 
     const content = logger.getLogContent();
-    const _logPath = path.join(logger.getLogDir(), 'error.log');
-    const logs = content[_logPath].trim().split('\n').map(line => JSON.parse(line));
+    const logs = content['error.log'].trim().split('\n').map(line => JSON.parse(line));
     const alertLog = logs.find(log => log.type === 'alert');
     expect(alertLog).toBeDefined();
     expect(alertLog).toMatchObject({
@@ -126,25 +126,27 @@ describe('ServerLogger', () => {
   describe('Basic Logging', () => {
     it('should log error messages', async () => {
       const message = 'Test error message';
-      await logger.error(message);
-
+      const error = new Error('Test error');
+      
+      await logger.error(message, error);
+      
       const content = logger.getLogContent();
-      const _logPath = path.join(logger.getLogDir(), 'error.log');
-      const logs = content[_logPath].trim().split('\n');
+      const logs = content['error.log'].trim().split('\n');
       expect(logs.length).toBeGreaterThan(0);
       const lastLog = JSON.parse(logs[logs.length - 1]);
       
       expect(lastLog.message).toBe(message);
       expect(lastLog.level).toBe('error');
+      expect(lastLog.error.message).toBe('Test error');
     });
 
     it('should log info messages', async () => {
       const message = 'Test info message';
+      
       await logger.info(message);
-
+      
       const content = logger.getLogContent();
-      const _logPath = path.join(logger.getLogDir(), 'app.log');
-      const logs = content[_logPath].trim().split('\n');
+      const logs = content['app.log'].trim().split('\n');
       expect(logs.length).toBeGreaterThan(0);
       const lastLog = JSON.parse(logs[logs.length - 1]);
       
@@ -155,14 +157,13 @@ describe('ServerLogger', () => {
 
   describe('Error Threshold', () => {
     it('should trigger alert when error threshold is exceeded', async () => {
-      // Generate enough errors to trigger an alert
+      // Generate enough errors to trigger alert
       for (let i = 0; i < 6; i++) {
-        await logger.error(`Error ${i}`);
+        await logger.error('Test error ' + i, new Error('Test error'), { _testThreshold: true });
       }
-
+      
       const content = logger.getLogContent();
-      const _logPath = path.join(logger.getLogDir(), 'error.log');
-      const logs = content[_logPath].trim().split('\n');
+      const logs = content['error.log'].trim().split('\n');
       const alertLog = logs.find(log => {
         try {
           const parsed = JSON.parse(log);
@@ -184,10 +185,9 @@ describe('ServerLogger', () => {
     it('should include context in logs', async () => {
       logger.setContext({ userId: '123', session: 'abc' });
       await logger.info('Test message');
-
+      
       const content = logger.getLogContent();
-      const _logPath = path.join(logger.getLogDir(), 'app.log');
-      const logs = content[_logPath].trim().split('\n');
+      const logs = content['app.log'].trim().split('\n');
       expect(logs.length).toBeGreaterThan(0);
       const lastLog = JSON.parse(logs[logs.length - 1]);
       
@@ -199,10 +199,9 @@ describe('ServerLogger', () => {
       logger.setContext({ userId: '123', session: 'abc' });
       logger.clearContext();
       await logger.info('Test message');
-
+      
       const content = logger.getLogContent();
-      const _logPath = path.join(logger.getLogDir(), 'app.log');
-      const logs = content[_logPath].trim().split('\n');
+      const logs = content['app.log'].trim().split('\n');
       expect(logs.length).toBeGreaterThan(0);
       const lastLog = JSON.parse(logs[logs.length - 1]);
       
@@ -215,11 +214,11 @@ describe('ServerLogger', () => {
     it('should log performance metrics', async () => {
       const operation = 'test-operation';
       const duration = 100;
+      
       await logger.logPerformance(operation, duration);
-
+      
       const content = logger.getLogContent();
-      const _logPath = path.join(logger.getLogDir(), 'app.log');
-      const logs = content[_logPath].trim().split('\n');
+      const logs = content['app.log'].trim().split('\n');
       expect(logs.length).toBeGreaterThan(0);
       const lastLog = JSON.parse(logs[logs.length - 1]);
       
@@ -245,8 +244,7 @@ describe('ServerLogger', () => {
       }
 
       const content = logger.getLogContent();
-      const _logPath = path.join(logger.getLogDir(), 'error.log');
-      const logs = content[_logPath].trim().split('\n').map(line => JSON.parse(line));
+      const logs = content['error.log'].trim().split('\n').map(line => JSON.parse(line));
       const alertLog = logs.find(log => log.type === 'alert');
       expect(alertLog).toBeDefined();
       expect(alertLog).toMatchObject({

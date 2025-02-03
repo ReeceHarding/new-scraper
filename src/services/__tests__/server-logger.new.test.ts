@@ -1,5 +1,4 @@
 import { ServerLogger } from '../server-logger';
-import path from 'path';
 
 describe('ServerLogger', () => {
   let logger: ServerLogger;
@@ -23,8 +22,7 @@ describe('ServerLogger', () => {
       await logger.waitForWrites();
       
       const content = logger.getLogContent();
-      const logPath = path.join(logger.getLogDir(), 'app.log');
-      const logs = content[logPath].trim().split('\n');
+      const logs = content['app.log'].trim().split('\n');
       expect(logs.length).toBeGreaterThan(0);
       const lastLog = JSON.parse(logs[logs.length - 1]);
       
@@ -41,8 +39,7 @@ describe('ServerLogger', () => {
       await logger.waitForWrites();
       
       const content = logger.getLogContent();
-      const logPath = path.join(logger.getLogDir(), 'error.log');
-      const logs = content[logPath].trim().split('\n');
+      const logs = content['error.log'].trim().split('\n');
       expect(logs.length).toBeGreaterThan(0);
       const lastLog = JSON.parse(logs[logs.length - 1]);
       
@@ -65,8 +62,7 @@ describe('ServerLogger', () => {
       await logger.waitForWrites();
       
       const content = logger.getLogContent();
-      const logPath = path.join(logger.getLogDir(), 'app.log');
-      const logs = content[logPath].trim().split('\n');
+      const logs = content['app.log'].trim().split('\n');
       expect(logs.length).toBeGreaterThan(0);
       const lastLog = JSON.parse(logs[logs.length - 1]);
       expect(lastLog.message).toBe('New message after rotation');
@@ -82,8 +78,7 @@ describe('ServerLogger', () => {
       }
       
       const content = logger.getLogContent();
-      const logPath = path.join(logger.getLogDir(), 'error.log');
-      const logs = content[logPath].trim().split('\n');
+      const logs = content['error.log'].trim().split('\n');
       
       // Find all alert logs
       const alertLogs = logs.filter(log => {
@@ -107,12 +102,11 @@ describe('ServerLogger', () => {
   describe('Context Management', () => {
     test('should include context in logs', async () => {
       logger.setContext({ userId: '123', session: 'abc' });
-      await logger.info('Test message with context');
+      await logger.info('Test message');
       await logger.waitForWrites();
       
       const content = logger.getLogContent();
-      const logPath = path.join(logger.getLogDir(), 'app.log');
-      const logs = content[logPath].trim().split('\n');
+      const logs = content['app.log'].trim().split('\n');
       expect(logs.length).toBeGreaterThan(0);
       const lastLog = JSON.parse(logs[logs.length - 1]);
       
@@ -123,12 +117,11 @@ describe('ServerLogger', () => {
     test('should clear context', async () => {
       logger.setContext({ userId: '123', session: 'abc' });
       logger.clearContext();
-      await logger.info('Test message without context');
+      await logger.info('Test message');
       await logger.waitForWrites();
       
       const content = logger.getLogContent();
-      const logPath = path.join(logger.getLogDir(), 'app.log');
-      const logs = content[logPath].trim().split('\n');
+      const logs = content['app.log'].trim().split('\n');
       expect(logs.length).toBeGreaterThan(0);
       const lastLog = JSON.parse(logs[logs.length - 1]);
       
@@ -146,8 +139,7 @@ describe('ServerLogger', () => {
       await logger.waitForWrites();
       
       const content = logger.getLogContent();
-      const logPath = path.join(logger.getLogDir(), 'app.log');
-      const logs = content[logPath].trim().split('\n');
+      const logs = content['app.log'].trim().split('\n');
       expect(logs.length).toBeGreaterThan(0);
       const lastLog = JSON.parse(logs[logs.length - 1]);
       

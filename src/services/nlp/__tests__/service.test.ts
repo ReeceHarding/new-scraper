@@ -2,26 +2,153 @@ import 'openai/shims/node';
 import { OpenAI } from 'openai';
 import { NLPService } from '../service';
 import { Context, Intent, Entity, LanguageDetectionResult, ResponseTemplate } from '../types';
-import { ERROR_CODES } from '../config';
+import { ERROR_CODES, SYSTEM_PROMPTS } from '../config';
 
 // Mock OpenAI
-jest.mock('openai');
+jest.mock('openai', () => {
+  const mockCreate = jest.fn().mockImplementation(async ({ messages }) => {
+    const prompt = messages[1].content;
+    const systemPrompt = messages[0].content;
 
-// Create a proper mock type for OpenAI chat completions
-type MockOpenAIChat = {
-  completions: {
-    create: jest.Mock;
+    // Mock intent classification
+    if (systemPrompt === SYSTEM_PROMPTS.intentClassification) {
+      return {
+        choices: [{
+          message: {
+            content: JSON.stringify({
+              type: 'LEAD_GENERATION',
+              confidence: 0.95,
+              parameters: {
+                industry: 'healthcare',
+                location: 'New York'
+              }
+            })
+          }
+        }]
+      };
+    }
+
+    // Mock keyword extraction
+    if (systemPrompt === SYSTEM_PROMPTS.keywordExtraction) {
+      return {
+        choices: [{
+          message: {
+            content: JSON.stringify([
+              { type: 'industry', value: 'dentist', confidence: 0.9 },
+              { type: 'location', value: 'New York', confidence: 0.95 }
+            ])
+          }
+        }]
+      };
+    }
+
+    // Mock search query generation
+    if (systemPrompt === SYSTEM_PROMPTS.searchQueryGeneration) {
+      return {
+        choices: [{
+          message: {
+            content: JSON.stringify([
+              'dentists in New York',
+              'dental practices NYC',
+              'healthcare providers dentistry New York'
+            ])
+          }
+        }]
+      };
+    }
+
+    // Mock location extraction
+    if (systemPrompt === SYSTEM_PROMPTS.locationExtraction) {
+      if (prompt.includes('New York')) {
+        return {
+          choices: [{
+            message: {
+              content: JSON.stringify({
+                latitude: 40.7128,
+                longitude: -74.0060,
+                radius: 25
+              })
+            }
+          }]
+        };
+      }
+      return {
+        choices: [{
+          message: {
+            content: 'null'
+          }
+        }]
+      };
+    }
+
+    // Mock industry filters
+    if (systemPrompt === SYSTEM_PROMPTS.industryFilters) {
+      return {
+        choices: [{
+          message: {
+            content: JSON.stringify({
+              companySize: ['1-10', '11-50', '51-200'],
+              businessType: ['Healthcare', 'Dental Practice'],
+              certifications: ['ADA', 'AAID'],
+              founded: '>1990'
+            })
+          }
+        }]
+      };
+    }
+
+    // Mock ranking configuration
+    if (systemPrompt === SYSTEM_PROMPTS.rankingConfiguration) {
+      // Extract context from the prompt
+      const hasLocation = prompt.includes('Location: any') ? false : true;
+      const hasIndustry = prompt.includes('Industry: any') ? false : true;
+
+      return {
+        choices: [{
+          message: {
+            content: JSON.stringify({
+              relevanceFactors: [
+                { name: 'industryMatch', weight: hasIndustry ? 0.4 : 0 },
+                { name: 'locationProximity', weight: hasLocation ? 0.3 : 0 },
+                { name: 'businessSize', weight: hasIndustry ? 0.2 : 0.3 },
+                { name: 'certifications', weight: 0.1 }
+              ],
+              boostFactors: {
+                hasWebsite: 1.2,
+                hasContactInfo: 1.1,
+                isVerifiedBusiness: 1.3
+              }
+            })
+          }
+        }]
+      };
+    }
+
+    // Default response
+    return {
+      choices: [{
+        message: {
+          content: JSON.stringify({})
+        }
+      }]
+    };
+  });
+
+  return {
+    OpenAI: jest.fn().mockImplementation(() => ({
+      chat: {
+        completions: {
+          create: mockCreate
+        }
+      }
+    }))
   };
-};
-
-type MockOpenAI = {
-  chat: MockOpenAIChat;
-};
+});
 
 describe('NLPService', () => {
   let nlpService: NLPService;
-  let mockOpenAI: MockOpenAI;
-  let mockLogger: { error: jest.Mock; info: jest.Mock };
+  let mockOpenAI: { chat: { completions: { create: jest.Mock } } };
+  let mockLogger: { error: jest.Mock; info: jest.Mock; warn: jest.Mock; debug: jest.Mock };
 
   beforeEach(() => {
     // Reset mocks
@@ -31,6 +158,8 @@ describe('NLPService', () => {
     mockLogger = {
       error: jest.fn(),
       info: jest.fn(),
+      warn: jest.fn(),
+      debug: jest.fn(),
     };
 
     // Create mock OpenAI instance with proper typing
@@ -144,35 +273,122 @@ describe('NLPService', () => {
 
   describe('generateSearchStrategy', () => {
     const mockContext: Context = {
-      businessGoal: 'I want to find dentists in New York',
+      businessGoal: 'Find dentists in New York',
       industry: 'healthcare',
       location: 'New York',
+      targetMarket: 'dentists'
     };
-
-    const mockIntent: Intent = {
-      type: 'LEAD_GENERATION',
-      confidence: 0.95,
-      parameters: { industry: 'healthcare' },
-    };
-
-    const mockKeywords: Entity[] = [
-      { type: 'industry', value: 'dentist', confidence: 0.9 },
-      { type: 'location', value: 'New York', confidence: 0.95 },
-    ];
 
     it('should generate search strategy correctly', async () => {
-      // Mock the dependent method calls
+      // Mock successful responses for all API calls
       mockOpenAI.chat.completions.create
-        .mockResolvedValueOnce({ choices: [{ message: { content: JSON.stringify(mockIntent) } }] })
-        .mockResolvedValueOnce({ choices: [{ message: { content: JSON.stringify(mockKeywords) } }] });
+        // Mock intent classification
+        .mockResolvedValueOnce({
+          choices: [{
+            message: {
+              content: JSON.stringify({
+                type: 'LEAD_GENERATION',
+                confidence: 0.95,
+                parameters: {
+                  industry: 'healthcare',
+                  location: 'New York'
+                }
+              })
+            }
+          }]
+        })
+        // Mock keyword extraction
+        .mockResolvedValueOnce({
+          choices: [{
+            message: {
+              content: JSON.stringify([
+                { type: 'industry', value: 'dentist', confidence: 0.9 },
+                { type: 'location', value: 'New York', confidence: 0.95 }
+              ])
+            }
+          }]
+        })
+        // Mock search query generation
+        .mockResolvedValueOnce({
+          choices: [{
+            message: {
+              content: JSON.stringify([
+                'dentists in New York',
+                'dental practices NYC',
+                'healthcare providers dentistry New York'
+              ])
+            }
+          }]
+        })
+        // Mock location extraction
+        .mockResolvedValueOnce({
+          choices: [{
+            message: {
+              content: JSON.stringify({
+                latitude: 40.7128,
+                longitude: -74.0060,
+                radius: 25
+              })
+            }
+          }]
+        })
+        // Mock industry filters
+        .mockResolvedValueOnce({
+          choices: [{
+            message: {
+              content: JSON.stringify({
+                companySize: ['1-10', '11-50', '51-200'],
+                businessType: ['Healthcare', 'Dental Practice'],
+                certifications: ['ADA', 'AAID'],
+                founded: '>1990'
+              })
+            }
+          }]
+        })
+        // Mock ranking configuration
+        .mockResolvedValueOnce({
+          choices: [{
+            message: {
+              content: JSON.stringify({
+                relevanceFactors: [
+                  { name: 'industryMatch', weight: 0.4 },
+                  { name: 'locationProximity', weight: 0.3 },
+                  { name: 'businessSize', weight: 0.2 },
+                  { name: 'certifications', weight: 0.1 }
+                ],
+                boostFactors: {
+                  hasWebsite: 1.2,
+                  hasContactInfo: 1.1,
+                  isVerifiedBusiness: 1.3
+                }
+              })
+            }
+          }]
+        });
 
       const result = await nlpService.generateSearchStrategy(mockContext);
       
-      expect(result.queries).toContain('dentist');
-      expect(result.queries).toContain('New York');
+      // Verify the structure matches SearchStrategy interface
+      expect(result).toBeDefined();
+      expect(result.queries).toBeInstanceOf(Array);
+      expect(result.queries.length).toBe(3);
+      expect(result.queries[0]).toBe('dentists in New York');
+      
+      expect(result.filters).toBeDefined();
       expect(result.filters.intent).toBe('LEAD_GENERATION');
-      expect(result.industry).toBe('healthcare');
+      expect(result.filters.companySize).toEqual(['1-10', '11-50', '51-200']);
+      
       expect(result.locationBias).toBeDefined();
+      expect(result.locationBias?.latitude).toBe(40.7128);
+      expect(result.locationBias?.longitude).toBe(-74.0060);
+      
+      expect(result.industry).toBe('healthcare');
+      expect(result.confidence).toBe(0.95);
+      
+      expect(result.ranking).toBeDefined();
+      expect(result.ranking.relevanceFactors).toHaveLength(4);
+      expect(result.ranking.boostFactors).toBeDefined();
+      expect(result.ranking.boostFactors.hasWebsite).toBe(1.2);
     });
 
     it('should throw on invalid context', async () => {

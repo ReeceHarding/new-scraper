@@ -58,6 +58,15 @@ Generate search filters that:
 - Include professional associations
 Return as JSON object with filter parameters.`,
 
+  rankingConfiguration: `You are an AI assistant specialized in search result ranking optimization.
+Generate a ranking configuration that:
+- Balances multiple relevance factors
+- Assigns appropriate weights based on context
+- Includes boost factors for quality signals
+Return a JSON object with:
+1. relevanceFactors: array of { name: string, weight: number } where weights sum to 1
+2. boostFactors: object with hasWebsite, hasContactInfo, isVerifiedBusiness multipliers`,
+
   responseGeneration: `You are an AI assistant specialized in generating business communications.
 Create responses that are:
 - Professional and courteous

@@ -1,5 +1,5 @@
 import { NLPService } from '../service';
-import { Context, SearchStrategy } from '../types';
+import { Context } from '../types';
 import { DEFAULT_CONFIG, SYSTEM_PROMPTS } from '../config';
 
 // Mock the OpenAI module
@@ -93,6 +93,33 @@ jest.mock('openai', () => {
               businessType: ['Software Development', 'Technology Services'],
               certifications: ['ISO 27001', 'SOC 2'],
               founded: '>2010'
+            })
+          }
+        }]
+      };
+    }
+
+    // Mock ranking configuration
+    if (systemPrompt === SYSTEM_PROMPTS.rankingConfiguration) {
+      // Extract context from the prompt
+      const hasLocation = prompt.includes('Location: any') ? false : true;
+      const hasIndustry = prompt.includes('Industry: any') ? false : true;
+
+      return {
+        choices: [{
+          message: {
+            content: JSON.stringify({
+              relevanceFactors: [
+                { name: 'industryMatch', weight: hasIndustry ? 0.4 : 0 },
+                { name: 'locationProximity', weight: hasLocation ? 0.3 : 0 },
+                { name: 'businessSize', weight: hasIndustry ? 0.2 : 0.3 },
+                { name: 'certifications', weight: 0.1 }
+              ],
+              boostFactors: {
+                hasWebsite: 1.2,
+                hasContactInfo: 1.1,
+                isVerifiedBusiness: 1.3
+              }
             })
           }
         }]

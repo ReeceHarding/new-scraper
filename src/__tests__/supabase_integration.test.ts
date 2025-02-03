@@ -15,6 +15,7 @@ describe('Supabase Integration', () => {
   test('can authenticate with email/password', async () => {
     const testEmail = `test-${Date.now()}@example.com`
     const testPassword = 'Test123!'
+    const testOrgName = `Test Org ${Date.now()}`
 
     // Sign up
     const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
@@ -23,6 +24,44 @@ describe('Supabase Integration', () => {
     })
     expect(signUpError).toBeNull()
     expect(signUpData.user).toBeTruthy()
+
+    if (signUpData.user) {
+      // Create organization
+      const { data: orgData, error: orgError } = await supabase
+        .from('organizations')
+        .insert({
+          name: testOrgName,
+          owner_id: signUpData.user.id,
+          metadata: {}
+        })
+        .select()
+        .single()
+      expect(orgError).toBeNull()
+      expect(orgData).toBeTruthy()
+
+      // Create profile
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .insert({
+          id: signUpData.user.id,
+          org_id: orgData.id,
+          email: testEmail,
+          role: 'owner',
+          metadata: {}
+        })
+      expect(profileError).toBeNull()
+
+      // Create organization member
+      const { error: memberError } = await supabase
+        .from('organization_members')
+        .insert({
+          org_id: orgData.id,
+          profile_id: signUpData.user.id,
+          role: 'owner',
+          metadata: {}
+        })
+      expect(memberError).toBeNull()
+    }
 
     // Sign in
     const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
@@ -33,7 +72,28 @@ describe('Supabase Integration', () => {
     expect(signInData.user).toBeTruthy()
 
     // Clean up
-    await supabase.rpc('cleanup_test_db')
+    if (signUpData.user) {
+      // Delete organization member
+      await supabase
+        .from('organization_members')
+        .delete()
+        .match({ profile_id: signUpData.user.id })
+
+      // Delete profile
+      await supabase
+        .from('profiles')
+        .delete()
+        .match({ id: signUpData.user.id })
+
+      // Delete organization
+      await supabase
+        .from('organizations')
+        .delete()
+        .match({ owner_id: signUpData.user.id })
+
+      // Delete user
+      await supabase.auth.admin.deleteUser(signUpData.user.id)
+    }
   }, 30000)
 
   test('can access database tables', async () => {

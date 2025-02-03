@@ -18,9 +18,7 @@ const createMockQueryBuilder = () => {
     limit: jest.fn().mockReturnThis(),
     range: jest.fn().mockReturnThis(),
     in: jest.fn().mockReturnThis(),
-    // Return a promise by default
-    then: jest.fn().mockImplementation((...args: any[]) => {
-      const callback = args[0] as MockCallback<any>;
+    then: jest.fn().mockImplementation(function(this: any, callback: any) {
       return Promise.resolve(callback({ data: [], error: null }));
     })
   };
@@ -47,6 +45,20 @@ jest.mock('../services/client-logger', () => ({
     setTestMode: jest.fn().mockImplementation(() => Promise.resolve()),
     clearErrorCount: jest.fn().mockImplementation(() => Promise.resolve()),
     setContext: jest.fn().mockImplementation(() => Promise.resolve())
+  }
+}));
+
+// Mock server logger
+jest.mock('../services/server-logger', () => ({
+  ServerLogger: {
+    getInstance: jest.fn().mockReturnValue({
+      error: jest.fn().mockImplementation(() => Promise.resolve()),
+      info: jest.fn().mockImplementation(() => Promise.resolve()),
+      warn: jest.fn().mockImplementation(() => Promise.resolve()),
+      debug: jest.fn().mockImplementation(() => Promise.resolve()),
+      logPerformance: jest.fn().mockImplementation(() => Promise.resolve()),
+      setTestMode: jest.fn().mockImplementation(() => Promise.resolve())
+    })
   }
 }));
 
