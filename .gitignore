@@ -1,6 +1,8 @@
-# Large files
-logs/
+# Dependencies
 node_modules/
 .next/
+
+# Logs
+logs/
 *.log
 *.log.*
