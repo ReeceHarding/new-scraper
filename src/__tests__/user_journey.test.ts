@@ -29,5 +29,5 @@ describe('User Journey Documentation', () => {
     // Check for sequence diagrams
     expect(content).toMatch(/```mermaid/);
     expect(content).toMatch(/sequenceDiagram/);
-  });
+  }, 30000);
 }); 

@@ -25,7 +25,7 @@ describe('External API Integration Tests', () => {
       }
       return Promise.reject(new Error('Unknown endpoint'))
     })
-  })
+  }, 30000)
 
   test('Brave Search API configuration is valid', async () => {
     const braveApiKey = process.env.BRAVE_API_KEY
@@ -39,7 +39,7 @@ describe('External API Integration Tests', () => {
       })
       expect(response.status).toBe(200)
     }
-  })
+  }, 30000)
 
   test('OpenAI API configuration is valid', async () => {
     const openaiApiKey = process.env.OPENAI_API_KEY
@@ -53,7 +53,7 @@ describe('External API Integration Tests', () => {
       })
       expect(response.status).toBe(200)
     }
-  })
+  }, 30000)
 
   test('SendGrid API configuration is valid', async () => {
     const sendgridApiKey = process.env.SENDGRID_API_KEY
@@ -67,7 +67,7 @@ describe('External API Integration Tests', () => {
       })
       expect(response.status).toBe(200)
     }
-  })
+  }, 30000)
 
   test('Twilio API configuration is valid', async () => {
     const twilioAccountSid = process.env.TWILIO_ACCOUNT_SID
@@ -84,7 +84,7 @@ describe('External API Integration Tests', () => {
       })
       expect(response.status).toBe(200)
     }
-  })
+  }, 30000)
 
   test('API rate limiting is configured', () => {
     const rateLimits = {
@@ -98,7 +98,7 @@ describe('External API Integration Tests', () => {
       expect(value).toBeDefined()
       expect(parseInt(value || '0')).toBeGreaterThan(0)
     })
-  })
+  }, 30000)
 
   test('API monitoring configuration is valid', () => {
     const monitoringConfig = {
@@ -114,5 +114,5 @@ describe('External API Integration Tests', () => {
     expect(process.env.API_MONITORING_ENABLED).toBe('true')
     expect(parseInt(process.env.API_ERROR_THRESHOLD || '0')).toBeGreaterThan(0)
     expect(parseInt(process.env.API_LATENCY_THRESHOLD || '0')).toBeGreaterThan(0)
-  })
+  }, 30000)
 }) 

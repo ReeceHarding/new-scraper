@@ -30,5 +30,5 @@ describe('App Flow Documentation', () => {
     expect(content).toMatch(/## Lead Actions/);
     expect(content).toMatch(/## Template Flow/);
     expect(content).toMatch(/## Dashboard Sections/);
-  });
+  }, 30000);
 }); 

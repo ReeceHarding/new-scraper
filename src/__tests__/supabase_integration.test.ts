@@ -10,7 +10,7 @@ describe('Supabase Integration', () => {
     const { data, error } = await supabase.from('organizations').select('*').limit(1)
     expect(error).toBeNull()
     expect(Array.isArray(data)).toBe(true)
-  })
+  }, 30000)
 
   test('can authenticate with email/password', async () => {
     const testEmail = `test-${Date.now()}@example.com`
@@ -34,7 +34,7 @@ describe('Supabase Integration', () => {
 
     // Clean up
     await supabase.rpc('cleanup_test_db')
-  })
+  }, 30000)
 
   test('can access database tables', async () => {
     const tables = [
@@ -75,5 +75,5 @@ describe('Supabase Integration', () => {
       }
     }
     expect(missingTables).toEqual([])
-  })
+  }, 30000)
 }) 

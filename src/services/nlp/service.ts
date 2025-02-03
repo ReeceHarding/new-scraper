@@ -94,6 +94,7 @@ export class NLPService {
       
       return context;
     } catch (error: any) {
+      this.logger.error('Failed to process business goal:', error);
       throw this.createError(
         ERROR_CODES.PROCESSING_ERROR,
         'Failed to process business goal',
@@ -127,6 +128,7 @@ export class NLPService {
       
       return intent;
     } catch (error: any) {
+      this.logger.error('Failed to classify intent:', error);
       throw this.createError(
         ERROR_CODES.PROCESSING_ERROR,
         'Failed to classify intent',
@@ -160,6 +162,7 @@ export class NLPService {
       
       return keywords;
     } catch (error: any) {
+      this.logger.error('Failed to extract keywords:', error);
       throw this.createError(
         ERROR_CODES.PROCESSING_ERROR,
         'Failed to extract keywords',
@@ -200,6 +203,7 @@ export class NLPService {
 
       return strategy;
     } catch (error: any) {
+      this.logger.error('Failed to generate search strategy:', error);
       throw this.createError(
         ERROR_CODES.PROCESSING_ERROR,
         'Failed to generate search strategy',
@@ -223,6 +227,7 @@ export class NLPService {
       
       return JSON.parse(response) as LanguageDetectionResult;
     } catch (error: any) {
+      this.logger.error('Failed to detect language:', error);
       throw this.createError(
         ERROR_CODES.PROCESSING_ERROR,
         'Failed to detect language',
@@ -255,6 +260,7 @@ export class NLPService {
         confidence: detectionResult.confidence,
       };
     } catch (error: any) {
+      this.logger.error('Failed to translate text:', error);
       throw this.createError(
         ERROR_CODES.PROCESSING_ERROR,
         'Failed to translate text',
@@ -277,6 +283,7 @@ export class NLPService {
       
       return JSON.parse(response) as ResponseTemplate;
     } catch (error: any) {
+      this.logger.error('Failed to generate response:', error);
       throw this.createError(
         ERROR_CODES.PROCESSING_ERROR,
         'Failed to generate response',

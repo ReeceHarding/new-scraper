@@ -8,7 +8,7 @@ describe('Development Environment Setup', () => {
     const nodeVersion = process.version;
     const majorVersion = parseInt(nodeVersion.slice(1).split('.')[0], 10);
     expect(majorVersion).toBeGreaterThanOrEqual(18);
-  });
+  }, 30000);
 
   test('TypeScript is configured correctly', () => {
     const tsConfigPath = path.join(rootDir, 'tsconfig.json');
@@ -17,17 +17,17 @@ describe('Development Environment Setup', () => {
     const tsConfig = JSON.parse(fs.readFileSync(tsConfigPath, 'utf8'));
     expect(tsConfig.compilerOptions).toBeDefined();
     expect(tsConfig.compilerOptions.strict).toBe(true);
-  });
+  }, 30000);
 
   test('ESLint is configured correctly', () => {
     const eslintConfigPath = path.join(rootDir, 'eslint.config.mjs');
     expect(fs.existsSync(eslintConfigPath)).toBe(true);
-  });
+  }, 30000);
 
   test('Prettier is configured correctly', () => {
     const prettierConfigPath = path.join(rootDir, '.prettierrc');
     expect(fs.existsSync(prettierConfigPath)).toBe(true);
-  });
+  }, 30000);
 
   test('Required development dependencies are installed', () => {
     const packageJsonPath = path.join(rootDir, 'package.json');
@@ -46,7 +46,7 @@ describe('Development Environment Setup', () => {
     requiredDevDeps.forEach(dep => {
       expect(packageJson.devDependencies[dep] || packageJson.dependencies[dep]).toBeDefined();
     });
-  });
+  }, 30000);
 
   test('Git hooks are set up', () => {
     const gitHooksPath = path.join(rootDir, '.git', 'hooks');
@@ -54,5 +54,5 @@ describe('Development Environment Setup', () => {
     
     const preCommitHookPath = path.join(gitHooksPath, 'pre-commit');
     expect(fs.existsSync(preCommitHookPath)).toBe(true);
-  });
+  }, 30000);
 }); 

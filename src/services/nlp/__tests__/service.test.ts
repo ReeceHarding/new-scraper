@@ -1,7 +1,7 @@
 import 'openai/shims/node';
 import { OpenAI } from 'openai';
 import { NLPService } from '../service';
-import { Context, Intent, Entity, SearchStrategy, LanguageDetectionResult, TranslationResult, ResponseTemplate } from '../types';
+import { Context, Intent, Entity, LanguageDetectionResult, ResponseTemplate } from '../types';
 import { ERROR_CODES } from '../config';
 
 // Mock OpenAI
@@ -201,12 +201,6 @@ describe('NLPService', () => {
   });
 
   describe('translate', () => {
-    const mockTranslation: TranslationResult = {
-      translatedText: 'Hola mundo',
-      detectedLanguage: 'en',
-      confidence: 0.98,
-    };
-
     it('should translate text correctly', async () => {
       mockOpenAI.chat.completions.create
         .mockResolvedValueOnce({ choices: [{ message: { content: 'Hola mundo' } }] })

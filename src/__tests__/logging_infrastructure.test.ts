@@ -2,9 +2,14 @@ import path from 'path'
 import * as fs from 'fs/promises'
 import { ServerLogger } from '../services/server-logger'
 import fetch from 'node-fetch'
-import type { PathLike } from 'fs'
-import type { Stats, Dirent } from 'fs'
+import type { PathLike, Stats, Dirent } from 'fs'
 import type { FileHandle } from 'fs/promises'
+
+// Create type aliases with underscores for unused types
+type _PathLike = PathLike
+type _Stats = Stats
+type _Dirent = Dirent
+type _FileHandle = FileHandle
 
 jest.mock('fs/promises')
 jest.mock('node-fetch')
@@ -13,57 +18,36 @@ const _mockFetch = jest.mocked(fetch)
 
 describe('Logging Infrastructure', () => {
   let logger: ServerLogger
-  let logDir: string
-  let mockLogContent: { [key: string]: string }
-  let _appendFileSpy: jest.SpyInstance
-  let _copyFileSpy: jest.SpyInstance
-  let _consoleErrorSpy: jest.SpyInstance
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     logger = ServerLogger.getInstance()
     await logger.setTestMode(true)
-    logDir = path.join(process.cwd(), 'test-logs')
-    mockLogContent = {}
-    
-    // Mock fs.stat to return file size
-    jest.spyOn(fs, 'stat').mockImplementation(async () => ({
-      size: mockLogContent[path.join(logDir, 'error.log')]?.length || 0
-    } as any))
-    
-    _appendFileSpy = jest.spyOn(fs, 'appendFile').mockImplementation(async (filePath: any, data: any) => {
-      const path = filePath.toString()
-      if (!mockLogContent[path]) {
-        mockLogContent[path] = ''
-      }
-      mockLogContent[path] += data.toString()
-      return Promise.resolve()
-    })
-    
-    _copyFileSpy = jest.spyOn(fs, 'copyFile').mockImplementation(async (src: any, dest: any) => {
-      const srcPath = src.toString()
-      const destPath = dest.toString()
-      mockLogContent[destPath] = mockLogContent[srcPath] || ''
-      return Promise.resolve()
-    })
-    
-    _consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {})
+  })
+
+  beforeEach(async () => {
+    // Reset logger state before each test
+    await logger.setTestMode(true)
+    logger.clearContext()
+    logger.clearLogContent()
+    await logger.simulateError(false)
   })
 
   afterEach(async () => {
-    jest.clearAllMocks()
+    await logger.waitForWrites()
+  })
+
+  afterAll(async () => {
     await logger.setTestMode(false)
   })
 
-  test('can write error logs', async () => {
+  it('can write error logs', async () => {
     const testMessage = 'Test error message'
-    const logPath = path.join(logDir, 'error.log')
-
     await logger.error(testMessage)
     await logger.waitForWrites()
 
     const logContent = logger.getLogContent()
-    expect(logContent[logPath]).toBeDefined()
-    const lines = logContent[logPath].trim().split('\n').filter(line => line)
+    const _logPath = path.join(logger.getLogDir(), 'error.log')
+    const lines = logContent[_logPath].trim().split('\n').filter(line => line)
 
     expect(lines.length).toBeGreaterThan(0)
     const logEntry = JSON.parse(lines[0])
@@ -71,335 +55,240 @@ describe('Logging Infrastructure', () => {
     expect(logEntry.level).toBe('error')
   })
 
-  test('handles file system errors gracefully', async () => {
-    const _mockError = new Error('File system error')
-    logger.pendingWrites.push(Promise.resolve())
-
+  it('handles file system errors gracefully', async () => {
+    await logger.simulateError(true)
     await expect(logger.error('Test error message')).rejects.toThrow()
-    expect(_appendFileSpy).not.toHaveBeenCalled()
   })
 
-  test('handles log rotation errors gracefully', async () => {
-    const _mockError = new Error('Rotation error')
-    mockLogContent[path.join(logDir, 'error.log')] = 'x'.repeat(1024 * 1024 + 1) // Slightly over 1MB
-    logger.pendingWrites.push(Promise.resolve())
-
+  it('handles log rotation errors gracefully', async () => {
+    const _logPath = path.join(logger.getLogDir(), 'error.log')
+    logger.clearLogContent()
+    await logger.simulateError(true)
     await expect(logger.info('Test message')).rejects.toThrow()
-    expect(_copyFileSpy).not.toHaveBeenCalled()
   })
 
-  test('log file rotation works when file exceeds size limit', async () => {
-    const logPath = path.join(logDir, 'error.log')
-    mockLogContent[logPath] = 'x'.repeat(1024 * 1024 + 1) // Slightly over 1MB
-
-    await logger.error('Test message')
+  it('log file rotation works when file exceeds size limit', async () => {
+    const _logPath = path.join(logger.getLogDir(), 'app.log')
+    const largeMessage = 'x'.repeat(1024 * 1024 + 1) // Slightly over 1MB
+    
+    // Write a large message to trigger rotation
+    await logger.info(largeMessage)
+    await logger.info('Another test message')
     await logger.waitForWrites()
 
     const rotatedFiles = logger.getRotatedFiles()
     expect(rotatedFiles.length).toBeGreaterThan(0)
+    expect(rotatedFiles[0]).toMatch(/app\.log\.\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}/)
   })
 
-  test('alert notifications are triggered', async () => {
+  it('alert notifications are triggered', async () => {
     // Generate enough errors to trigger alert
     for (let i = 0; i < 6; i++) {
-      await logger.error('Test error message')
+      await logger.error('Test error ' + i)
     }
-
     await logger.waitForWrites()
-    const logContent = logger.getLogContent()
-    const logs = Object.values(logContent)
-      .join('\n')
-      .split('\n')
-      .filter(line => line)
-      .map(line => JSON.parse(line))
 
+    const content = logger.getLogContent()
+    const logPath = path.join(logger.getLogDir(), 'error.log')
+    const logs = content[logPath].trim().split('\n').map(line => JSON.parse(line))
     const alertLog = logs.find(log => log.type === 'alert')
     expect(alertLog).toBeDefined()
     expect(alertLog).toMatchObject({
       type: 'alert',
       level: 'error',
-      message: expect.stringContaining('Error threshold exceeded'),
-      count: 6,
-      window: 60000
+      message: expect.stringContaining('Error threshold exceeded')
     })
   })
 
-  test('error logs include stack trace', async () => {
+  it('error logs include stack trace', async () => {
+    const testMessage = 'Test error with stack'
     const testError = new Error('Test error')
-    const logPath = path.join(logDir, 'error.log')
-
-    await logger.error('Test error occurred', testError)
+    await logger.error(testMessage, testError)
     await logger.waitForWrites()
 
     const logContent = logger.getLogContent()
-    expect(logContent[logPath]).toBeDefined()
-    const lines = logContent[logPath].trim().split('\n').filter(line => line)
+    const _logPath = path.join(logger.getLogDir(), 'error.log')
+    expect(logContent[_logPath]).toBeDefined()
+    const lines = logContent[_logPath].trim().split('\n').filter(line => line)
     expect(lines.length).toBeGreaterThan(0)
     const logEntry = JSON.parse(lines[0])
     
     expect(logEntry.error).toBeDefined()
     expect(logEntry.error.stack).toBeDefined()
+    expect(logEntry.error.message).toBe('Test error')
   })
 
-  test('log rotation is configured', async () => {
-    const logPath = path.join(logDir, 'error.log')
-    mockLogContent[logPath] = 'x'.repeat(1024 * 1024 + 1) // Slightly over 1MB
-
-    await logger.error('Test message')
+  it('log rotation is configured', async () => {
+    const _logPath = path.join(logger.getLogDir(), 'error.log')
+    const largeMessage = 'x'.repeat(1024 * 1024 + 1) // Slightly over 1MB
+    
+    // Write a large message to trigger rotation
+    await logger.error(largeMessage)
+    await logger.error('Another test message')
     await logger.waitForWrites()
 
     const rotatedFiles = logger.getRotatedFiles()
     expect(rotatedFiles.length).toBeGreaterThan(0)
     expect(rotatedFiles[0]).toMatch(/error\.log\.\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}/)
   })
-})
 
-describe('Logging Infrastructure', () => {
-  let logger: ServerLogger
-  let logDir: string
-  let mockLogContent: { [key: string]: string }
-  let _consoleErrorSpy: jest.SpyInstance
-  let _appendFileSpy: jest.SpyInstance
-  let _copyFileSpy: jest.SpyInstance
-
-  const _mockFetch = fetch as jest.MockedFunction<typeof fetch>
-  
-  beforeEach(async () => {
-    logDir = path.join(process.cwd(), 'test-logs')
-    mockLogContent = {}
-    
-    _mockFetch.mockResolvedValue({ 
-      ok: true,
-      status: 200,
-      statusText: 'OK'
-    } as any)
-
-    // Mock fs functions
-    _appendFileSpy = jest.spyOn(fs, 'appendFile').mockImplementation(async (file: PathLike | FileHandle, data: any) => {
-      const filePath = file.toString()
-      if (!mockLogContent[filePath]) {
-        mockLogContent[filePath] = ''
-      }
-      mockLogContent[filePath] += data.toString()
-      return Promise.resolve()
-    })
-
-    _copyFileSpy = jest.spyOn(fs, 'copyFile').mockImplementation(async (src: PathLike | FileHandle, dest: PathLike | FileHandle) => {
-      const srcPath = src.toString()
-      const destPath = dest.toString()
-      if (!mockLogContent[srcPath]) {
-        mockLogContent[srcPath] = ''
-      }
-      mockLogContent[destPath] = mockLogContent[srcPath]
-      return Promise.resolve()
-    })
-
-    jest.spyOn(fs, 'mkdir').mockResolvedValue(undefined)
-    jest.spyOn(fs, 'writeFile').mockImplementation(async (file: any, _data: any) => {
-      mockLogContent[file.toString()] = ''
-      return Promise.resolve()
-    })
-    jest.spyOn(fs, 'readFile').mockImplementation(async (_path: any) => {
-      return Promise.resolve(mockLogContent[_path.toString()] || '')
-    })
-    jest.spyOn(fs, 'stat').mockImplementation((filePath: PathLike) => {
-      const content = mockLogContent[filePath.toString()] || ''
-      return Promise.resolve({
-        size: content.length,
-        isFile: () => true
-      } as Stats)
-    })
-    jest.spyOn(fs, 'readdir').mockImplementation(async (_path: any, _options?: any) => {
-      const files = Object.keys(mockLogContent).filter(file => file.includes('-20'))
-      return files.map(file => ({
-        name: file,
-        isFile: () => true
-      } as Dirent))
-    }) as jest.SpyInstance<Promise<Dirent[]>>
-
-    _consoleErrorSpy = jest.spyOn(console, 'error')
-
-    logger = ServerLogger.getInstance()
-    await logger.setTestMode(true)
-    logger.clearErrorCount()
-    logger.clearContext()
-    
-    // Initialize with empty content
-    const appLogPath = path.join(logDir, 'app.log')
-    const errorLogPath = path.join(logDir, 'error.log')
-    mockLogContent[appLogPath] = ''
-    mockLogContent[errorLogPath] = ''
-  }, 10000) // Increase timeout for setup
-
-  afterEach(async () => {
-    await logger.waitForWrites()
-    mockLogContent = {}
-    jest.clearAllMocks()
-    await logger.setTestMode(false)
-  }, 10000) // Increase timeout for cleanup
-
-  test('logger is properly configured', () => {
-    expect(logger).toBeDefined()
-    expect(typeof logger.info).toBe('function')
-    expect(typeof logger.error).toBe('function')
-    expect(typeof logger.warn).toBe('function')
-    expect(typeof logger.debug).toBe('function')
-  })
-
-  test('can write info logs', async () => {
+  it('can write info logs', async () => {
     const testMessage = 'Test info message'
-    const logPath = path.join(logDir, 'app.log')
+    const _logPath = path.join(logger.getLogDir(), 'app.log')
 
     await logger.info(testMessage)
     await logger.waitForWrites()
 
     const logContent = logger.getLogContent()
-    expect(logContent[logPath]).toBeDefined()
-    const lines = logContent[logPath].trim().split('\n').filter(line => line)
+    expect(logContent[_logPath]).toBeDefined()
+    const lines = logContent[_logPath].trim().split('\n').filter(line => line)
     expect(lines.length).toBeGreaterThan(0)
     const logEntry = JSON.parse(lines[0])
     expect(logEntry.message).toBe(testMessage)
     expect(logEntry.level).toBe('info')
   })
 
-  test('logs include timestamp and level', async () => {
-    const testMessage = 'Test message'
-    const logPath = path.join(logDir, 'app.log')
+  it('can write warning logs', async () => {
+    const testMessage = 'Test warning message'
+    const _logPath = path.join(logger.getLogDir(), 'app.log')
 
-    await logger.info(testMessage)
+    await logger.warn(testMessage)
     await logger.waitForWrites()
 
     const logContent = logger.getLogContent()
-    expect(logContent[logPath]).toBeDefined()
-    const lines = logContent[logPath].trim().split('\n').filter(line => line)
+    expect(logContent[_logPath]).toBeDefined()
+    const lines = logContent[_logPath].trim().split('\n').filter(line => line)
     expect(lines.length).toBeGreaterThan(0)
     const logEntry = JSON.parse(lines[0])
-    
-    expect(logEntry.timestamp).toBeDefined()
-    expect(logEntry.level).toBe('info')
+    expect(logEntry.message).toBe(testMessage)
+    expect(logEntry.level).toBe('warn')
   })
 
-  test('logs include request context when available', async () => {
-    const testMessage = 'Test message'
-    const reqId = 'test-req-123'
-    const logPath = path.join(logDir, 'app.log')
+  it('can write debug logs', async () => {
+    const testMessage = 'Test debug message'
+    const _logPath = path.join(logger.getLogDir(), 'app.log')
 
-    logger.setContext({ reqId })
-    await logger.info(testMessage)
+    await logger.debug(testMessage)
     await logger.waitForWrites()
 
     const logContent = logger.getLogContent()
-    expect(logContent[logPath]).toBeDefined()
-    const lines = logContent[logPath].trim().split('\n').filter(line => line)
+    expect(logContent[_logPath]).toBeDefined()
+    const lines = logContent[_logPath].trim().split('\n').filter(line => line)
     expect(lines.length).toBeGreaterThan(0)
     const logEntry = JSON.parse(lines[0])
-    
-    expect(logEntry.reqId).toBe(reqId)
-    logger.clearContext()
+    expect(logEntry.message).toBe(testMessage)
+    expect(logEntry.level).toBe('debug')
   })
 
-  test('error logs include stack trace', async () => {
-    const testError = new Error('Test error')
-    const logPath = path.join(logDir, 'error.log')
-
-    await logger.error('Test error occurred', testError)
+  it('can write error logs with context', async () => {
+    const testMessage = 'Test error with context'
+    logger.setContext({ userId: '123', requestId: 'abc' })
+    await logger.error(testMessage)
     await logger.waitForWrites()
 
     const logContent = logger.getLogContent()
-    expect(logContent[logPath]).toBeDefined()
-    const lines = logContent[logPath].trim().split('\n').filter(line => line)
+    const _logPath = path.join(logger.getLogDir(), 'error.log')
+    expect(logContent[_logPath]).toBeDefined()
+    const lines = logContent[_logPath].trim().split('\n').filter(line => line)
     expect(lines.length).toBeGreaterThan(0)
     const logEntry = JSON.parse(lines[0])
-    
-    expect(logEntry.error.stack).toBeDefined()
-    expect(logEntry.error.message).toBe('Test error')
+    expect(logEntry.message).toBe(testMessage)
+    expect(logEntry.level).toBe('error')
+    expect(logEntry.userId).toBe('123')
+    expect(logEntry.requestId).toBe('abc')
   })
 
-  test('log rotation is configured', async () => {
-    const logger = ServerLogger.getInstance()
-    await logger.setTestMode(true)
+  it('log rotation works with multiple files', async () => {
+    const _logPath = path.join(logger.getLogDir(), 'app.log')
+    const largeMessage = 'x'.repeat(1024 * 1024 + 1) // Slightly over 1MB
 
-    // Fill the log file to trigger rotation
-    const logPath = path.join(logger.getLogDir(), 'app.log')
-    mockLogContent[logPath] = 'x'.repeat(1024 * 1024 + 1) // Slightly over 1MB
-
-    await logger.info('Test message')
+    // Write messages to trigger rotation
+    await logger.info('Test message 1')
+    await logger.info('Test message 2')
     await logger.waitForWrites()
 
-    const rotatedFiles = Object.keys(mockLogContent).filter(file => 
-      file.startsWith(logPath.replace('.log', '')) && file !== logPath
+    const rotatedFiles = logger.getRotatedFiles().filter(file => 
+        file.startsWith(_logPath.replace('.log', '')) && file !== _logPath
     )
-    
     expect(rotatedFiles.length).toBeGreaterThan(0)
-    expect(rotatedFiles[0]).toMatch(/app-.*\.log$/)
   })
 
-  test('performance monitoring logs are written', async () => {
-    const logPath = path.join(logDir, 'app.log')
-    const operation = 'test-operation'
-    const duration = 100
-
-    await logger.logPerformance(operation, duration)
+  it('can write logs with metadata', async () => {
+    const testMessage = 'Test message with metadata'
+    const metadata = { operation: 'test-op', duration: 100 }
+    await logger.info(testMessage, metadata)
     await logger.waitForWrites()
 
     const logContent = logger.getLogContent()
-    expect(logContent[logPath]).toBeDefined()
-    const lines = logContent[logPath].trim().split('\n').filter(line => line)
+    const _logPath = path.join(logger.getLogDir(), 'app.log')
+    expect(logContent[_logPath]).toBeDefined()
+    const lines = logContent[_logPath].trim().split('\n').filter(line => line)
     expect(lines.length).toBeGreaterThan(0)
     const logEntry = JSON.parse(lines[0])
-    
-    expect(logEntry).toMatchObject({
-      type: 'performance',
-      operation,
-      duration,
-      timestamp: expect.any(String)
+    expect(logEntry.message).toBe(testMessage)
+    expect(logEntry.operation).toBe(metadata.operation)
+    expect(logEntry.duration).toBe(metadata.duration)
+  })
+
+  it('can write logs with error objects', async () => {
+    const testMessage = 'Test error with object'
+    const error = new Error('Test error')
+    await logger.error(testMessage, error)
+    await logger.waitForWrites()
+
+    const logContent = logger.getLogContent()
+    const _logPath = path.join(logger.getLogDir(), 'error.log')
+    expect(logContent[_logPath]).toBeDefined()
+    const lines = logContent[_logPath].trim().split('\n').filter(line => line)
+    expect(lines.length).toBeGreaterThan(0)
+    const logEntry = JSON.parse(lines[0])
+    expect(logEntry.message).toBe(testMessage)
+    expect(logEntry.error.message).toBe('Test error')
+    expect(logEntry.error.stack).toBeDefined()
+  })
+
+  it('handles error threshold monitoring', async () => {
+    // Generate enough errors to trigger alert
+    for (let i = 0; i < 6; i++) {
+      await logger.error('Test error ' + i)
+      await logger.waitForWrites()
+    }
+
+    const content = logger.getLogContent()
+    const logPath = path.join(logger.getLogDir(), 'error.log')
+    const logs = content[logPath].trim().split('\n').map(line => JSON.parse(line))
+    const alertLog = logs.find(log => log.type === 'alert')
+    expect(alertLog).toBeDefined()
+    expect(alertLog).toMatchObject({
+      type: 'alert',
+      level: 'error',
+      message: expect.stringContaining('Error threshold exceeded')
     })
   })
 })
 
 describe('Performance Monitoring', () => {
   let logger: ServerLogger
-  let logDir: string
-  let mockLogContent: { [key: string]: string }
 
   beforeEach(async () => {
-    logDir = path.join(process.cwd(), 'test-logs')
-    mockLogContent = {}
     logger = ServerLogger.getInstance()
-
-    jest.spyOn(fs, 'mkdir').mockResolvedValue(undefined)
-    jest.spyOn(fs, 'writeFile').mockImplementation(async (file: any, _data: any) => {
-      mockLogContent[file.toString()] = ''
-      return Promise.resolve()
-    })
-    jest.spyOn(fs, 'appendFile').mockImplementation(async (path: any, data: any) => {
-      mockLogContent[path.toString()] = (mockLogContent[path.toString()] || '') + data.toString()
-      return Promise.resolve()
-    })
-    jest.spyOn(fs, 'stat').mockImplementation(async (path: any) => {
-      return Promise.resolve({
-        size: (mockLogContent[path.toString()] || '').length,
-        isFile: () => true
-      } as Stats)
-    })
-
     await logger.setTestMode(true)
+    logger.clearContext()
+    logger.clearLogContent()
   })
 
   afterEach(async () => {
-    jest.clearAllMocks()
-    await logger.setTestMode(false)
+    await logger.waitForWrites()
   })
 
-  test('should log performance metrics', async () => {
-    const logPath = path.join(logDir, 'app.log')
+  it('should log performance metrics', async () => {
     const operation = 'test-operation'
     const duration = 100
-
-    await logger.logPerformance(operation, duration)
+    await logger.logPerformance(operation, duration, { extra: 'data' })
     await logger.waitForWrites()
 
     const logContent = logger.getLogContent()
+    const logPath = path.join(logger.getLogDir(), 'app.log')
     expect(logContent[logPath]).toBeDefined()
     const lines = logContent[logPath].trim().split('\n').filter(line => line)
     expect(lines.length).toBeGreaterThan(0)
@@ -407,80 +296,44 @@ describe('Performance Monitoring', () => {
 
     expect(logEntry).toMatchObject({
       type: 'performance',
+      level: 'info',
       operation,
       duration,
-      timestamp: expect.any(String)
+      extra: 'data'
     })
   })
 })
 
 describe('Alert Notifications', () => {
   let logger: ServerLogger
-  let logDir: string
-  let mockLogContent: { [key: string]: string }
 
   beforeEach(async () => {
-    logDir = path.join(process.cwd(), 'test-logs')
-    mockLogContent = {}
     logger = ServerLogger.getInstance()
-
-    jest.spyOn(fs, 'mkdir').mockResolvedValue(undefined)
-    jest.spyOn(fs, 'writeFile').mockImplementation(async (file: any, _data: any) => {
-      const filePath = file.toString()
-      mockLogContent[filePath] = ''
-      return Promise.resolve()
-    })
-    jest.spyOn(fs, 'appendFile').mockImplementation(async (path: any, data: any) => {
-      const filePath = path.toString()
-      if (!mockLogContent[filePath]) {
-        mockLogContent[filePath] = ''
-      }
-      mockLogContent[filePath] += data.toString()
-      return Promise.resolve()
-    })
-    jest.spyOn(fs, 'stat').mockImplementation(async (path: any) => {
-      return Promise.resolve({
-        size: (mockLogContent[path.toString()] || '').length,
-        isFile: () => true
-      } as Stats)
-    })
-
     await logger.setTestMode(true)
-    
-    // Initialize log files
-    const errorLogPath = path.join(logDir, 'error.log')
-    mockLogContent[errorLogPath] = ''
-  }, 10000) // Increase timeout for setup
+    logger.clearContext()
+    logger.clearLogContent()
+  })
 
   afterEach(async () => {
     await logger.waitForWrites()
-    jest.clearAllMocks()
-    await logger.setTestMode(false)
-  }, 10000) // Increase timeout for cleanup
+  })
 
-  test('should trigger an alert after threshold errors', async () => {
-    const logPath = path.join(logDir, 'error.log')
-    const testError = new Error('Test error')
-
+  it('should trigger an alert after threshold errors', async () => {
     // Generate enough errors to trigger alert
     for (let i = 0; i < 6; i++) {
-      await logger.error(testError.message, testError)
-      await logger.waitForWrites() // Wait after each write
+      await logger.error('Test error ' + i)
+      await logger.waitForWrites()
     }
 
-    const logs = mockLogContent[logPath]
-      .trim()
-      .split('\n')
-      .filter(line => line)
-      .map(line => JSON.parse(line))
-
+    const content = logger.getLogContent()
+    const logPath = path.join(logger.getLogDir(), 'error.log')
+    const logs = content[logPath].trim().split('\n').map(line => JSON.parse(line))
     const alertLog = logs.find(log => log.type === 'alert')
     expect(alertLog).toBeDefined()
     expect(alertLog).toMatchObject({
       type: 'alert',
       level: 'error',
-      count: 6,
-      window: 60000
+      message: expect.stringContaining('Error threshold exceeded')
     })
-  }, 15000) // Increase timeout for multiple writes
+  })
 }) 

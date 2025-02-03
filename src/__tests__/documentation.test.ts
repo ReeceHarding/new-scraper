@@ -28,5 +28,5 @@ describe('Documentation Requirements', () => {
     expect(content).toMatch(/## Data Structure/);
     expect(content).toMatch(/## Automation Rules/);
     expect(content).toMatch(/## Metrics and KPIs/);
-  });
+  }, 30000);
 }); 

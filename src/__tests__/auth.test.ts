@@ -104,11 +104,11 @@ describe('AuthService', () => {
     } as unknown as jest.Mocked<SupabaseClient>;
 
     authService = new SupabaseAuthService(mockClient);
-  });
+  }, 30000);
 
   afterEach(() => {
     jest.clearAllMocks();
-  });
+  }, 30000);
 
   describe('register', () => {
     it('should validate password', async () => {

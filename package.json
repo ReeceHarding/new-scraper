@@ -8,8 +8,11 @@
     "start": "next start",
     "lint": "next lint",
     "test": "jest",
+    "test:strict": "jest --verbose --detectOpenHandles --forceExit --runInBand",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
+    "test:clean": "jest --clearCache && rm -rf coverage .next && jest --verbose --detectOpenHandles --forceExit --runInBand --testTimeout 60000",
+    "test:full": "jest --verbose --detectOpenHandles --forceExit --runInBand --ci --json --outputFile=test-results.json",
     "db:reset": "supabase db reset"
   },
   "repository": {
@@ -60,6 +63,7 @@
     "eslint-config-next": "^15.1.6",
     "husky": "^9.1.7",
     "jest-environment-jsdom": "^29.7.0",
+    "jest-summary-reporter": "^0.0.2",
     "postcss": "^8.5.1",
     "prettier": "^3.4.2",
     "tailwindcss": "^4.0.3",

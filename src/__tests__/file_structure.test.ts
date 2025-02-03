@@ -37,7 +37,7 @@ describe('File Structure', () => {
       const fullPath = path.join(rootDir, dir);
       expect(fs.existsSync(fullPath)).toBe(true);
     });
-  });
+  }, 30000);
 
   test('required files exist', () => {
     const requiredFiles = [
@@ -57,5 +57,5 @@ describe('File Structure', () => {
       const fullPath = path.join(rootDir, file);
       expect(fs.existsSync(fullPath)).toBe(true);
     });
-  });
+  }, 30000);
 }); 

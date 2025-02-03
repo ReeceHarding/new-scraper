@@ -8,6 +8,7 @@ interface LogEntry {
   type: string;
   message: string;
   error?: {
+    name: string;
     message: string;
     stack?: string;
   };
@@ -15,6 +16,7 @@ interface LogEntry {
   window?: number;
   operation?: string;
   duration?: number;
+  _errorTracked?: boolean;
   [key: string]: any;
 }
 
@@ -22,7 +24,7 @@ const MAX_LOG_SIZE = 1024 * 1024 // 1MB
 
 export class ServerLogger {
   private static instance: ServerLogger
-  private testMode = false
+  private testMode: boolean = false
   private errorCounts: { timestamp: number }[] = []
   private readonly ALERT_THRESHOLD = 5
   private readonly ALERT_WINDOW = 60000 // 1 minute
@@ -39,6 +41,11 @@ export class ServerLogger {
   private shouldSimulateError = false
   private errorWindowMs = 60000 // 1 minute
   private recentErrors: number[] = []
+  private isProcessingAlert = false
+  private errorThreshold: number = 5
+  private errorThresholdWindow: number = 60000 // 60 seconds
+  private apiEndpoint: string = 'http://localhost:3001/api/logs'
+  private errorTimestamps: number[] = []
 
   private constructor() {
     this.logDir = path.join(process.cwd(), 'logs')
@@ -57,101 +64,93 @@ export class ServerLogger {
 
   private async ensureInitialized(): Promise<void> {
     if (!this.initialized) {
-      await fs.mkdir(this.logDir, { recursive: true })
-      const appLogPath = path.join(this.logDir, 'app.log')
-      const errorLogPath = path.join(this.logDir, 'error.log')
-      
-      // Initialize empty log content
-      this.logContent[appLogPath] = ''
-      this.logContent[errorLogPath] = ''
-      
-      // Create empty log files
-      await fs.writeFile(appLogPath, '')
-      await fs.writeFile(errorLogPath, '')
-      
-      this.initialized = true
-    }
-  }
-
-  public async setTestMode(enabled: boolean): Promise<void> {
-    this.testMode = enabled;
-    this.initialized = false;
-    this.logContent = {};
-    this.errorCounts = [];
-    this.rotatedFiles = [];
-    this.pendingWrites = [];
-    this.shouldSimulateError = false;
-    this.lastAlertTime = 0;
-    
-    if (enabled) {
-      this.logDir = path.join(process.cwd(), 'test-logs');
-      
-      // Initialize log files for test mode
       await fs.mkdir(this.logDir, { recursive: true });
       const appLogPath = path.join(this.logDir, 'app.log');
       const errorLogPath = path.join(this.logDir, 'error.log');
+      
+      if (this.testMode) {
+        // Initialize empty log content for both paths
+        this.logContent[appLogPath] = '';
+        this.logContent[errorLogPath] = '';
+      } else {
+        // Only create physical files in non-test mode
+        try {
+          await fs.access(appLogPath);
+        } catch {
+          await fs.writeFile(appLogPath, '');
+        }
+        try {
+          await fs.access(errorLogPath);
+        } catch {
+          await fs.writeFile(errorLogPath, '');
+        }
+      }
+      
+      this.initialized = true;
+    }
+  }
+
+  private async addPendingWrite(writePromise: Promise<void>): Promise<void> {
+    const write = writePromise.finally(() => {
+      this.pendingWrites = this.pendingWrites.filter(p => p !== write);
+    });
+    this.pendingWrites.push(write);
+    await write; // Wait for the write to complete
+  }
+
+  public async setTestMode(enabled: boolean): Promise<void> {
+    // Wait for any pending operations to complete before switching modes
+    await this.waitForWrites();
+    
+    this.testMode = enabled;
+    this.initialized = false;
+    
+    // Clear all state
+    this.logContent = {};
+    this.errorCounts = [];
+    this.rotatedFiles = [];
+    this.lastAlertTime = 0;
+    this.isProcessingAlert = false;
+    this.shouldSimulateError = false;
+    this.context = {};
+    this.pendingWrites = [];
+    this.errorTimestamps = [];
+    
+    if (enabled) {
+      this.logDir = path.join(process.cwd(), 'test-logs');
+      this.maxFileSize = 100; // Smaller size for testing
+      
+      // Initialize empty log files for test mode
+      const appLogPath = path.join(this.logDir, 'app.log');
+      const errorLogPath = path.join(this.logDir, 'error.log');
+      
+      // Ensure the test log directory exists
+      await fs.mkdir(this.logDir, { recursive: true });
       
       // Initialize empty log content
       this.logContent[appLogPath] = '';
       this.logContent[errorLogPath] = '';
       
-      // Create empty log files (needed for mocks)
-      await fs.writeFile(appLogPath, '');
-      await fs.writeFile(errorLogPath, '');
+      // Set initialized to true since we've set up the test environment
+      this.initialized = true;
     } else {
       this.logDir = path.join(process.cwd(), 'logs');
+      this.maxFileSize = MAX_LOG_SIZE;
+      // Initialize the logger with the new settings
+      await this.ensureInitialized();
     }
-    
-    this.initialized = true;
   }
 
-  private async handleWrite(logEntry: LogEntry, logPath: string): Promise<void> {
-    if (this.testMode) {
-      if (this.shouldSimulateError) {
-        throw new Error('Simulated file system error in test mode');
-      }
-      this.logContent[logPath] = this.logContent[logPath] || '';
-      this.logContent[logPath] += JSON.stringify(logEntry) + '\n';
-      return;
-    }
-    // ... existing code ...
-  }
-
-  private async writeToFile(logPath: string, content: string): Promise<void> {
-    await this.ensureInitialized();
-    
-    // Initialize log content for test mode
-    if (this.testMode && !this.logContent[logPath]) {
-      this.logContent[logPath] = '';
-    }
-
-    try {
-      // Check if rotation is needed before writing
-      const currentSize = this.testMode 
-        ? Buffer.from(this.logContent[logPath] || '').length
-        : (await fs.stat(logPath)).size;
-
-      if (currentSize >= this.maxFileSize) {
-        await this.rotateLogFile(logPath);
-      }
-
-      // Write the log entry
-      if (this.testMode) {
-        this.logContent[logPath] = (this.logContent[logPath] || '') + content + '\n';
-      } else {
-        await fs.appendFile(logPath, content + '\n');
-      }
-
-      // If this is an error log, check the threshold
-      if (logPath.endsWith('error.log') && content.includes('"level":"error"')) {
-        await this.checkErrorThreshold();
-      }
-    } catch (error: unknown) {
-      // Always throw in test mode
-      if (this.testMode) {
-        throw error;
-      }
-      throw error;
+  public async simulateError(simulate: boolean): Promise<void> {
+    this.shouldSimulateError = simulate;
+    if (simulate) {
+      // Clear any existing content to ensure clean state for error simulation
+      this.logContent = {};
+      this.rotatedFiles = [];
+      this.recentErrors = [];
+      this.lastAlertTime = 0;
+      this.errorCounts = [];
+      this.isProcessingAlert = false;
     }
   }
 
@@ -161,260 +160,333 @@ export class ServerLogger {
       const rotatedPath = `${logPath}.${timestamp}`;
       
       if (this.testMode) {
+        if (this.shouldSimulateError) {
+          throw new Error('Simulated rotation error in test mode');
+        }
+        
         // Copy current content to rotated file
         this.logContent[rotatedPath] = this.logContent[logPath] || '';
         // Clear current log file
         this.logContent[logPath] = '';
-        // Add to rotated files list if not already present
+        // Add to rotated files list
         if (!this.rotatedFiles.includes(rotatedPath)) {
           this.rotatedFiles.push(rotatedPath);
         }
       } else {
-        await fs.copyFile(logPath, rotatedPath);
-        await fs.writeFile(logPath, '');
-        if (!this.rotatedFiles.includes(rotatedPath)) {
-          this.rotatedFiles.push(rotatedPath);
+        // In non-test mode, ensure the file exists before rotating
+        try {
+          await fs.access(logPath);
+          await fs.copyFile(logPath, rotatedPath);
+          await fs.writeFile(logPath, '');
+          if (!this.rotatedFiles.includes(rotatedPath)) {
+            this.rotatedFiles.push(rotatedPath);
+          }
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+            throw error;
+          }
+          // If file doesn't exist, just create an empty one
+          await fs.writeFile(logPath, '');
         }
       }
-    } catch (error: unknown) {
-      // Always throw in test mode
+
+      // Clean up old rotated files (keep last 5)
+      const maxRotatedFiles = 5;
+      if (this.rotatedFiles.length > maxRotatedFiles) {
+        const filesToRemove = this.rotatedFiles.slice(0, this.rotatedFiles.length - maxRotatedFiles);
+        this.rotatedFiles = this.rotatedFiles.slice(-maxRotatedFiles);
+        
+        for (const oldFile of filesToRemove) {
+          if (this.testMode) {
+            delete this.logContent[oldFile];
+          } else {
+            try {
+              await fs.unlink(oldFile);
+            } catch (error) {
+              console.error(`Failed to delete old log file ${oldFile}:`, error);
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error during log rotation:', error);
       if (this.testMode) {
         throw error;
+      }
+    }
+  }
+
+  private async trackError(): Promise<void> {
+    const now = Date.now();
+    this.errorTimestamps.push(now);
+    
+    // Remove errors outside the window
+    this.errorTimestamps = this.errorTimestamps.filter(
+      timestamp => now - timestamp <= this.errorWindowMs
+    );
+
+    // Check if threshold is exceeded
+    if (this.errorTimestamps.length >= this.errorThreshold) {
+      const alertEntry: LogEntry = {
+        type: 'alert',
+        level: 'error',
+        message: `Error threshold exceeded: ${this.errorTimestamps.length} errors in ${this.errorWindowMs / 1000} seconds`,
+        count: this.errorTimestamps.length,
+        window: this.errorWindowMs,
+        timestamp: new Date().toISOString()
+      };
+
+      await this.writeToFile(alertEntry, path.join(this.logDir, 'error.log'));
+      
+      // Reset error timestamps after alert
+      this.errorTimestamps = [];
+    }
+  }
+
+  private async writeToFile(logEntry: LogEntry, logPath: string): Promise<void> {
+    await this.ensureInitialized();
+    
+    // Ensure proper JSON formatting with context
+    const formattedEntry = {
+      ...logEntry,
+      ...this.context,
+      timestamp: logEntry.timestamp || new Date().toISOString()
+    };
+    
+    const logString = JSON.stringify(formattedEntry) + '\n';
+    
+    try {
+      if (this.testMode) {
+        // In test mode, append to in-memory log content
+        if (!this.logContent[logPath]) {
+          this.logContent[logPath] = '';
+        }
+        this.logContent[logPath] += logString;
+        
+        // Check if we need to rotate in test mode
+        if (this.logContent[logPath].length > this.maxFileSize) {
+          await this.rotateLogFile(logPath);
+        }
+
+        // Track errors in test mode - only if not already being tracked
+        if (logEntry.level === 'error' && !logEntry._errorTracked) {
+          await this.trackError();
+        }
+
+        // Simulate error if needed
+        if (this.shouldSimulateError) {
+          throw new Error('Simulated error in test mode');
+        }
+      } else {
+        // Production mode - write to actual file
+        await fs.appendFile(logPath, logString);
+        
+        if (logEntry.level === 'error' && !logEntry._errorTracked) {
+          await this.trackError();
+        }
+
+        // Only send to API in production mode
+        if (this.logApiUrl) {
+          await this.sendToLogApi(formattedEntry).catch(err => {
+            console.error('Error sending log to API:', err);
+          });
+        }
+      }
+    } catch (error) {
+      if (!this.testMode) {
+        console.error('Error writing to log file:', error);
       }
       throw error;
     }
   }
 
   private async checkErrorThreshold(): Promise<void> {
-    const currentTime = Date.now();
-    
-    // Remove old errors outside the time window
+    const now = Date.now();
+    // Remove errors outside the window
     this.errorCounts = this.errorCounts.filter(
-      entry => currentTime - entry.timestamp < this.ALERT_WINDOW
+      count => now - count.timestamp < this.errorThresholdWindow
     );
-    
-    // Add current error
-    this.errorCounts.push({ timestamp: currentTime });
-    
-    // Check if we need to trigger an alert
-    if (
-      this.errorCounts.length >= this.ALERT_THRESHOLD &&
-      (currentTime - this.lastAlertTime >= this.ALERT_WINDOW || !this.lastAlertTime)
-    ) {
-      const alertEntry: LogEntry = {
-        timestamp: new Date().toISOString(),
-        type: 'alert',
-        level: 'error',
-        message: `Error threshold exceeded: ${this.errorCounts.length} errors in ${this.ALERT_WINDOW / 1000}s`,
-        count: this.errorCounts.length,
-        window: this.ALERT_WINDOW
-      };
-      
-      // Write alert entry to log file
-      const logPath = path.join(this.logDir, 'error.log');
-      await this.writeToFile(logPath, JSON.stringify(alertEntry));
-      this.lastAlertTime = currentTime;
-      
-      // Reset error counts after alert
-      this.errorCounts = [];
+
+    if (this.errorCounts.length >= this.errorThreshold && !this.isProcessingAlert) {
+      this.isProcessingAlert = true;
+      try {
+        const alertEntry: LogEntry = {
+          type: 'alert',
+          level: 'error',
+          message: `Error threshold exceeded: ${this.errorCounts.length} errors in ${this.errorThresholdWindow / 1000}s`,
+          timestamp: new Date().toISOString(),
+          count: this.errorCounts.length,
+          window: this.errorThresholdWindow
+        };
+
+        const logPath = path.join(this.logDir, 'error.log');
+        await this.writeToFile(alertEntry, logPath);
+      } finally {
+        this.isProcessingAlert = false;
+      }
     }
   }
 
-  public async info(message: string, data: Record<string, any> = {}): Promise<void> {
+  public async error(message: string, error?: Error, data: Record<string, any> = {}): Promise<void> {
     await this.ensureInitialized();
-
-    const logEntry: LogEntry = {
-      timestamp: new Date().toISOString(),
-      level: 'info',
-      type: 'log',
-      message,
-      ...this.context,
-      ...data
-    };
-
-    try {
-      const logPath = path.join(this.logDir, 'app.log');
-      await this.writeToFile(logPath, JSON.stringify(logEntry));
-      
-      if (!this.testMode) {
-        await this.sendToLogApi('info', message, logEntry);
-      }
-    } catch (error: unknown) {
-      // Always throw in test mode
-      if (this.testMode) {
-        throw error;
-      }
-      throw error;
-    }
-  }
-
-  public async warn(message: string, data: Record<string, any> = {}): Promise<void> {
-    await this.ensureInitialized();
-
-    const logEntry: LogEntry = {
-      timestamp: new Date().toISOString(),
-      level: 'warn',
-      type: 'log',
-      message,
-      ...this.context,
-      ...data
-    };
-
-    try {
-      const logPath = path.join(this.logDir, 'app.log');
-      await this.writeToFile(logPath, JSON.stringify(logEntry));
-      
-      if (!this.testMode) {
-        await this.sendToLogApi('warn', message, logEntry);
-      }
-    } catch (error: unknown) {
-      // Always throw in test mode
-      if (this.testMode) {
-        throw error;
-      }
-      throw error;
-    }
-  }
-
-  public async debug(message: string, data: Record<string, any> = {}): Promise<void> {
-    await this.ensureInitialized();
-
-    const logEntry: LogEntry = {
-      timestamp: new Date().toISOString(),
-      level: 'debug',
-      type: 'log',
-      message,
-      ...this.context,
-      ...data
-    };
-
-    try {
-      const logPath = path.join(this.logDir, 'app.log');
-      await this.writeToFile(logPath, JSON.stringify(logEntry));
-      
-      if (!this.testMode) {
-        await this.sendToLogApi('debug', message, logEntry);
-      }
-    } catch (error: unknown) {
-      // Always throw in test mode
-      if (this.testMode) {
-        throw error;
-      }
-      throw error;
-    }
-  }
-
-  public async error(message: string, error?: Error): Promise<void> {
-    await this.ensureInitialized();
-    await this.checkErrorThreshold();
-
     const logEntry: LogEntry = {
       timestamp: new Date().toISOString(),
       level: 'error',
       type: 'error',
       message,
-      error: error ? {
-        message: error.message,
-        stack: error.stack
-      } : undefined,
-      ...this.context
+      _errorTracked: true,
+      ...data
     };
 
-    try {
-      const logPath = path.join(this.logDir, 'error.log');
-      await this.writeToFile(logPath, JSON.stringify(logEntry));
-      
-      if (!this.testMode) {
-        await this.sendToLogApi('error', message, logEntry);
-      }
-    } catch (error: unknown) {
-      // Always throw in test mode
-      if (this.testMode) {
-        throw error;
-      }
-      throw error;
+    if (error) {
+      logEntry.error = {
+        name: error.name,
+        message: error.message,
+        stack: error.stack
+      };
     }
+
+    const logPath = path.join(this.logDir, 'error.log');
+    const writePromise = this.writeToFile(logEntry, logPath);
+    await this.addPendingWrite(writePromise);
+  }
+
+  public async info(message: string, data: Record<string, any> = {}): Promise<void> {
+    await this.ensureInitialized();
+    const logEntry: LogEntry = {
+      timestamp: new Date().toISOString(),
+      level: 'info',
+      type: 'info',
+      message,
+      ...data
+    };
+
+    const logPath = path.join(this.logDir, 'app.log');
+    const writePromise = this.writeToFile(logEntry, logPath);
+    await this.addPendingWrite(writePromise);
+  }
+
+  public async warn(message: string, data: Record<string, any> = {}): Promise<void> {
+    await this.ensureInitialized();
+    const logEntry: LogEntry = {
+      timestamp: new Date().toISOString(),
+      level: 'warn',
+      type: 'warn',
+      message,
+      ...data
+    };
+
+    const logPath = path.join(this.logDir, 'app.log');
+    const writePromise = this.writeToFile(logEntry, logPath);
+    await this.addPendingWrite(writePromise);
+  }
+
+  public async debug(message: string, data: Record<string, any> = {}): Promise<void> {
+    await this.ensureInitialized();
+    const logEntry: LogEntry = {
+      timestamp: new Date().toISOString(),
+      level: 'debug',
+      type: 'debug',
+      message,
+      ...data
+    };
+
+    const logPath = path.join(this.logDir, 'app.log');
+    const writePromise = this.writeToFile(logEntry, logPath);
+    await this.addPendingWrite(writePromise);
   }
 
   public async logPerformance(operation: string, duration: number, data: Record<string, any> = {}): Promise<void> {
-    const logEntry = {
+    await this.ensureInitialized();
+    const performanceEntry: LogEntry = {
       timestamp: new Date().toISOString(),
       type: 'performance',
+      level: 'info',
+      message: `Performance metrics for ${operation}`,
       operation,
       duration,
-      ...this.context,
       ...data
-    }
+    };
 
-    await this.writeToFile(path.join(this.logDir, 'app.log'), JSON.stringify(logEntry))
-    
-    if (!this.testMode) {
-      await this.sendToLogApi('info', `Performance: ${operation}`, logEntry, 'performance')
-    }
+    const logPath = path.join(this.logDir, 'app.log');
+    const writePromise = this.writeToFile(performanceEntry, logPath);
+    await this.addPendingWrite(writePromise);
   }
 
   public async waitForWrites(): Promise<void> {
-    try {
-      await Promise.all(this.pendingWrites);
-    } finally {
-      this.pendingWrites = [];
+    if (this.pendingWrites.length > 0) {
+      try {
+        await Promise.all(this.pendingWrites.map(p => p.catch(() => {})));
+      } finally {
+        this.pendingWrites = [];
+      }
     }
   }
 
-  private async sendToLogApi(level: string, message: string, data: any, type: string = 'log'): Promise<void> {
-    if (this.testMode) {
-      return;
-    }
+  private async sendToLogApi(logEntry: LogEntry): Promise<void> {
+    if (!this.testMode && this.logApiUrl) {
+      try {
+        const response = await fetch(this.logApiUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(logEntry)
+        });
 
-    try {
-      const response = await fetch(this.logApiUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          level,
-          message,
-          data,
-          type,
-          timestamp: new Date().toISOString()
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to send log to API: ${response.statusText}`);
+        if (!response.ok) {
+          throw new Error(`Failed to send log to API: ${response.statusText}`);
+        }
+      } catch (error) {
+        console.error('Error sending log to API:', error);
       }
-    } catch (error) {
-      console.error('Error sending log to API:', error);
     }
   }
 
   public setContext(context: Record<string, any>): void {
-    this.context = { ...this.context, ...context }
+    this.context = { ...context };
   }
 
   public clearContext(): void {
-    this.context = {}
+    this.context = {};
   }
 
   public clearErrorCount(): void {
-    this.recentErrors = []
+    this.errorCounts = [];
+    this.lastAlertTime = 0;
   }
 
   public getLogContent(): { [key: string]: string } {
-    return this.logContent
+    return { ...this.logContent };
   }
 
   public getLogDir(): string {
-    return this.logDir
+    return this.logDir;
   }
 
   private getLogPath(): string {
-    return path.join(this.logDir, 'error.log')
+    return path.join(this.logDir, 'app.log');
   }
 
   public getRotatedFiles(): string[] {
-    return this.rotatedFiles;
+    return [...this.rotatedFiles];
+  }
+
+  public clearLogContent(): void {
+    const appLogPath = path.join(this.logDir, 'app.log');
+    const errorLogPath = path.join(this.logDir, 'error.log');
+    this.logContent = {
+      [appLogPath]: '',
+      [errorLogPath]: ''
+    };
+  }
+
+  public enableErrorSimulation(): void {
+    this.shouldSimulateError = true;
+  }
+
+  public disableErrorSimulation(): void {
+    this.shouldSimulateError = false;
   }
 }
 

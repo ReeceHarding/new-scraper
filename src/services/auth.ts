@@ -228,87 +228,59 @@ export class SupabaseAuthService implements AuthService {
         if (!resetError) {
           throw new Error('Email already registered');
         }
-      } catch (error) {
+      } catch (error: any) {
         // If we get a 422 error, it means the email doesn't exist, which is what we want
-        if (error instanceof Error && error.message.includes('422')) {
+        if (error.status === 422) {
           // Continue with registration
-        } else if (error instanceof Error && error.message === 'Email already registered') {
+        } else if (error.message === 'Email already registered') {
           throw error;
         } else {
-          // Don't throw here, continue with registration attempt
-          console.error('Password reset check failed:', error);
+          logger.error('Password reset check failed:', error);
+          // Only throw if it's not a 422 error
+          if (error.status !== 422) {
+            throw new Error('Registration failed: ' + error.message);
+          }
         }
       }
 
       // Register the user
-      let signUpResponse;
-      try {
-        signUpResponse = await this.client.auth.signUp({
-          email,
-          password,
-          options: {
-            emailRedirectTo: typeof window !== 'undefined' ? `${window.location.origin}/auth/callback` : undefined
-          }
-        });
-      } catch (error) {
-        logger.error('Registration failed', error instanceof Error ? error : new Error(String(error)));
-        throw new Error('Registration failed');
-      }
-
-      if (!signUpResponse || signUpResponse.error) {
-        throw new Error('Registration failed');
-      }
-
-      if (!signUpResponse.data?.user || !signUpResponse.data?.session) {
-        throw new Error('Registration failed');
-      }
-
-      const userId = signUpResponse.data.user.id;
-
-      try {
-        // Create user profile
-        const { error } = await this.client
-          .from('profiles')
-          .insert([
-            {
-              id: userId,
-              email: email,
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString()
-            }
-          ]);
-
-        if (error) {
-          // Clean up the created user since profile creation failed
-          try {
-            await this.client.auth.admin.deleteUser(userId);
-          } catch (cleanupError) {
-            console.error('Failed to clean up user after profile creation error:', cleanupError);
-          }
-          throw new Error('Registration failed');
+      const signUpResponse = await this.client.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo: typeof window !== 'undefined' ? `${window.location.origin}/auth/callback` : undefined
         }
+      });
 
-        return {
-          data: {
-            user: signUpResponse.data.user,
-            session: signUpResponse.data.session
-          },
-          error: null
-        };
-      } catch {
-        // Clean up the created user since profile creation failed
-        try {
-          await this.client.auth.admin.deleteUser(userId);
-        } catch (cleanupError) {
-          console.error('Failed to clean up user after profile creation error:', cleanupError);
-        }
-        throw new Error('Registration failed');
+      if (signUpResponse.error) {
+        throw signUpResponse.error;
       }
-    } catch (error) {
-      if (error instanceof Error) {
-        throw error;
+
+      if (!signUpResponse.data.user) {
+        throw new Error('Registration failed: No user data returned');
       }
-      throw new Error('Registration failed');
+
+      // Create user profile
+      const { error: profileError } = await this.client
+        .from('profiles')
+        .insert([{
+          id: signUpResponse.data.user.id,
+          email: email,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }]);
+
+      if (profileError) {
+        logger.error('Profile creation failed:', profileError);
+        // Clean up the auth user if profile creation fails
+        await this.client.auth.admin.deleteUser(signUpResponse.data.user.id);
+        throw new Error('Registration failed: Could not create profile');
+      }
+
+      return signUpResponse;
+    } catch (error: any) {
+      logger.error('Registration failed:', error);
+      throw error instanceof Error ? error : new Error(error.message || 'Registration failed');
     }
   }
 
